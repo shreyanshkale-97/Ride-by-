@@ -1,0 +1,382 @@
+import React, { forwardRef, useEffect, useRef } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { RideStop } from '../../services/routingService';
+
+export interface DisplayRider {
+  userId: string;
+  name: string;
+  role: 'leader' | 'member';
+  status: 'riding' | 'stopped' | 'at_meeting_point' | 'pending' | 'offline';
+  lat: number;
+  lng: number;
+  speed: number;
+  heading: number;
+  isLive: boolean;
+  isSelf: boolean;
+  distanceFromMe: number;
+  distanceFromLeader: number;
+  relativeToLeader: 'ahead' | 'behind' | 'together';
+}
+
+export interface RideMapProps {
+  myLat: number;
+  myLng: number;
+  startLat: number;
+  startLng: number;
+  startName?: string;
+  destLat: number;
+  destLng: number;
+  destName?: string;
+  routeCoordinates?: { lat: number; lng: number }[];
+  stops?: RideStop[];
+  riders: DisplayRider[];
+}
+
+export const RideMap = forwardRef<any, RideMapProps>(({
+  myLat,
+  myLng,
+  startLat,
+  startLng,
+  startName = 'Meeting Point',
+  destLat,
+  destLng,
+  destName = 'Destination',
+  routeCoordinates = [],
+  stops = [],
+  riders = [],
+}, _ref) => {
+  const iframeRef = useRef<any>(null);
+
+  const initialRouteJson = JSON.stringify(
+    routeCoordinates.map((c) => [c.lat, c.lng])
+  );
+
+  const stopsJson = JSON.stringify(
+    stops.map((s) => ({
+      id: s.id,
+      name: s.name,
+      type: s.type,
+      lat: s.lat,
+      lng: s.lng,
+      emoji: s.type === 'fuel' ? '⛽' : s.type === 'cafe' ? '☕' : '🛑',
+      color: s.type === 'fuel' ? '#f59e0b' : s.type === 'cafe' ? '#b45309' : '#3b82f6',
+    }))
+  );
+
+  const ridersJson = JSON.stringify(
+    riders.map((r) => ({
+      userId: r.userId,
+      name: r.name,
+      role: r.role,
+      status: r.status,
+      lat: r.lat,
+      lng: r.lng,
+      speed: Math.round(r.speed || 0),
+      heading: r.heading || 0,
+      isSelf: r.isSelf,
+      distanceFromMe: r.distanceFromMe,
+      distanceFromLeader: r.distanceFromLeader,
+      relativeToLeader: r.relativeToLeader,
+    }))
+  );
+
+  // Send real-time coordinate updates to the Leaflet iframe via postMessage
+  useEffect(() => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.postMessage(
+          {
+            type: 'UPDATE_LOCATIONS',
+            myLat,
+            myLng,
+            riders: riders.map((r) => ({
+              userId: r.userId,
+              name: r.name,
+              role: r.role,
+              status: r.status,
+              lat: r.lat,
+              lng: r.lng,
+              speed: Math.round(r.speed || 0),
+              heading: r.heading || 0,
+              isSelf: r.isSelf,
+              distanceFromMe: r.distanceFromMe,
+              distanceFromLeader: r.distanceFromLeader,
+              relativeToLeader: r.relativeToLeader,
+            })),
+          },
+          '*'
+        );
+      } catch (_) {}
+    }
+  }, [myLat, myLng, riders]);
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <style>
+        body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .custom-div-icon { background: transparent; border: none; }
+        
+        /* Pulsing Radar Ring for Self */
+        .self-marker {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .pulse-ring {
+          position: absolute;
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: rgba(37, 99, 235, 0.35);
+          animation: pulse 1.8s infinite ease-out;
+        }
+        @keyframes pulse {
+          0% { transform: scale(0.6); opacity: 1; }
+          100% { transform: scale(1.6); opacity: 0; }
+        }
+        .self-pin {
+          width: 32px;
+          height: 32px;
+          border-radius: 16px;
+          background: #2563eb;
+          color: white;
+          border: 3px solid white;
+          box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 15px;
+          font-weight: 800;
+          z-index: 2;
+        }
+
+        /* Leader Pin */
+        .leader-pin {
+          width: 34px;
+          height: 34px;
+          border-radius: 17px;
+          background: #ea580c;
+          color: white;
+          border: 3px solid #fef08a;
+          box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+        }
+
+        /* Member Pin */
+        .member-pin {
+          width: 30px;
+          height: 30px;
+          border-radius: 15px;
+          background: #4f46e5;
+          color: white;
+          border: 2px solid white;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+        }
+
+        /* Map Controls Overlay */
+        .map-controls {
+          position: absolute;
+          bottom: 24px;
+          right: 16px;
+          z-index: 1000;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .control-btn {
+          background: #ffffff;
+          border: 1px solid #d1d5db;
+          border-radius: 10px;
+          padding: 8px 12px;
+          font-size: 13px;
+          font-weight: 700;
+          color: #1f2937;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .control-btn:hover { background: #f3f4f6; }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      
+      <div class="map-controls">
+        <button class="control-btn" onclick="centerOnMe()">📍 My Location</button>
+        <button class="control-btn" onclick="fitFullRoute()">🛣 Whole Route</button>
+      </div>
+
+      <script>
+        var map = L.map('map', { zoomControl: true });
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        var bounds = L.latLngBounds([[${startLat}, ${startLng}], [${destLat}, ${destLng}]]);
+
+        // 1. START / MEETING POINT
+        var startIcon = L.divIcon({
+          className: 'custom-div-icon',
+          html: '<div style="background-color:#16a34a;color:white;width:34px;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 3px 8px rgba(0,0,0,0.3);font-size:18px;">📍</div>',
+          iconSize: [34, 34],
+          iconAnchor: [17, 34]
+        });
+        L.marker([${startLat}, ${startLng}], { icon: startIcon })
+          .addTo(map)
+          .bindPopup('<b>📍 Start: ${startName.replace(/'/g, "\\'")}</b><br>Meeting Point');
+
+        // 2. DESTINATION POINT
+        var destIcon = L.divIcon({
+          className: 'custom-div-icon',
+          html: '<div style="background-color:#dc2626;color:white;width:34px;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 3px 8px rgba(0,0,0,0.3);font-size:18px;">🏁</div>',
+          iconSize: [34, 34],
+          iconAnchor: [17, 34]
+        });
+        L.marker([${destLat}, ${destLng}], { icon: destIcon })
+          .addTo(map)
+          .bindPopup('<b>🏁 Finish: ${destName.replace(/'/g, "\\'")}</b><br>Ride Destination');
+
+        // 3. STOPS (Fuel, Cafe, Rest)
+        var stopsData = ${stopsJson};
+        stopsData.forEach(function(s) {
+          var stopIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: '<div style="background-color:' + s.color + ';color:white;width:30px;height:30px;border-radius:15px;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35);font-size:15px;">' + s.emoji + '</div>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 30]
+          });
+          L.marker([s.lat, s.lng], { icon: stopIcon })
+            .addTo(map)
+            .bindPopup('<b>' + s.emoji + ' ' + s.name + '</b><br><small>' + s.type.toUpperCase() + ' STOP</small>');
+          bounds.extend([s.lat, s.lng]);
+        });
+
+        // 4. ROUTE POLYLINE
+        var routeCoords = ${initialRouteJson};
+        var routePolyline = null;
+        if (routeCoords && routeCoords.length > 0) {
+          routePolyline = L.polyline(routeCoords, {
+            color: '#FF6B35',
+            weight: 6,
+            opacity: 0.95,
+            lineJoin: 'round'
+          }).addTo(map);
+          bounds.extend(routePolyline.getBounds());
+        }
+
+        // 5. RIDERS MARKERS
+        var riderMarkersMap = {};
+
+        function formatDist(m) {
+          if (!m && m !== 0) return '0m';
+          if (m < 1000) return Math.round(m) + 'm';
+          return (m / 1000).toFixed(1) + 'km';
+        }
+
+        function createRiderMarker(r) {
+          var iconHtml = '';
+          if (r.isSelf) {
+            iconHtml = '<div class="self-marker"><div class="pulse-ring"></div><div class="self-pin">📍</div></div>';
+          } else if (r.role === 'leader') {
+            iconHtml = '<div class="leader-pin">👑</div>';
+          } else {
+            iconHtml = '<div class="member-pin">🏍</div>';
+          }
+
+          var icon = L.divIcon({
+            className: 'custom-div-icon',
+            html: iconHtml,
+            iconSize: [36, 36],
+            iconAnchor: [18, 18]
+          });
+
+          var marker = L.marker([r.lat, r.lng], { icon: icon }).addTo(map);
+          marker.bindPopup(getRiderPopupContent(r));
+          return marker;
+        }
+
+        function getRiderPopupContent(r) {
+          var title = r.isSelf ? '📍 You (' + r.name + ')' : (r.role === 'leader' ? '👑 Leader: ' + r.name : '🏍 Rider: ' + r.name);
+          var statusText = r.status.replace(/_/g, ' ').toUpperCase();
+          var distMe = r.isSelf ? 'Here' : formatDist(r.distanceFromMe) + ' from you';
+          var relLeader = (!r.isSelf && r.role !== 'leader')
+            ? ('<br><b>Position:</b> ' + (r.relativeToLeader === 'ahead' ? '▲ ' : '▼ ') + formatDist(r.distanceFromLeader) + ' ' + r.relativeToLeader)
+            : '';
+
+          return '<div style="font-size:13px;line-height:1.4;">' +
+            '<b style="font-size:14px;color:#111;">' + title + '</b><br>' +
+            '<b>Status:</b> ' + statusText + '<br>' +
+            '<b>Speed:</b> ' + r.speed + ' km/h<br>' +
+            '<b>Distance:</b> ' + distMe +
+            relLeader +
+            '</div>';
+        }
+
+        // Initialize riders
+        var initialRiders = ${ridersJson};
+        initialRiders.forEach(function(r) {
+          riderMarkersMap[r.userId] = createRiderMarker(r);
+          bounds.extend([r.lat, r.lng]);
+        });
+
+        // Fit map initially
+        map.fitBounds(bounds, { padding: [45, 45] });
+
+        // Handler for real-time postMessage location updates
+        window.addEventListener('message', function(event) {
+          if (!event.data || event.data.type !== 'UPDATE_LOCATIONS') return;
+          var updateList = event.data.riders || [];
+          updateList.forEach(function(r) {
+            if (riderMarkersMap[r.userId]) {
+              riderMarkersMap[r.userId].setLatLng([r.lat, r.lng]);
+              riderMarkersMap[r.userId].setPopupContent(getRiderPopupContent(r));
+            } else {
+              riderMarkersMap[r.userId] = createRiderMarker(r);
+            }
+          });
+        });
+
+        window.centerOnMe = function() {
+          map.setView([${myLat}, ${myLng}], 15);
+        };
+
+        window.fitFullRoute = function() {
+          map.fitBounds(bounds, { padding: [45, 45] });
+        };
+      </script>
+    </body>
+    </html>
+  `;
+
+  return (
+    <View style={styles.container}>
+      <iframe
+        ref={iframeRef}
+        srcDoc={html}
+        style={{ width: '100%', height: '100%', border: 'none' }}
+        title="RideBy Live Route Map"
+      />
+    </View>
+  );
+});
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#000' },
+});
