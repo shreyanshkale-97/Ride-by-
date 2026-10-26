@@ -7,15 +7,15 @@ export const AppConstants = {
   MEETING_POINT_RADIUS_M: 100,       // within 100m = "at meeting point"
   STOPPED_SPEED_KMH: 5,              // below this = stopped
   STOPPED_THRESHOLD_SEC: 30,         // seconds before "stopped" label
-  MAX_GPS_ACCURACY_M: 20,            // reject GPS readings worse than this
+  MAX_GPS_ACCURACY_M: 80,            // reject GPS readings worse than 80m (phones typically 20-50m)
   MAX_SPEED_JUMP_KMH: 200,           // reject GPS spikes
   AHEAD_BEHIND_MIN_DIST_M: 50,       // no label if < 50m from leader
   WARNING_DISTANCE_BEHIND_M: 500,    // show warning if > 500m behind
 
-  // Broadcast intervals (adaptive by rider count)
-  BROADCAST_INTERVAL_SMALL_MS: 3000,   // ≤10 riders, moving
-  BROADCAST_INTERVAL_LARGE_MS: 5000,   // >10 riders, moving
-  BROADCAST_INTERVAL_STOPPED_MS: 20000,// stopped
+  // Broadcast intervals — update every 15s for all riders (moving or stopped)
+  BROADCAST_INTERVAL_SMALL_MS: 15000,  // ≤10 riders, moving — every 15s
+  BROADCAST_INTERVAL_LARGE_MS: 15000,  // >10 riders, moving — every 15s
+  BROADCAST_INTERVAL_STOPPED_MS: 15000,// stopped — every 15s (keep map fresh)
   SMALL_GROUP_THRESHOLD: 10,           // rider count threshold
 
   // Realtime event names

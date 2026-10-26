@@ -3,6 +3,8 @@ import { useRideStore } from '../store/rideStore';
 import { AppConstants } from '../constants';
 import { LocationPayload, SosPayload, RideStatusPayload, PresencePayload } from '../types';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { setActiveChannel } from './locationService';
+
 
 let activeChannel: RealtimeChannel | null = null;
 
@@ -72,6 +74,10 @@ export function subscribeToRide(
   // Subscribe and track own presence
   channel.subscribe(async (status) => {
     if (status === 'SUBSCRIBED') {
+      // Share the subscribed channel with locationService so it broadcasts on
+      // the correct channel object (not a new unsubscribed one)
+      setActiveChannel(channel);
+
       await channel.track({
         user_id: userId,
         name: userName,
@@ -80,6 +86,7 @@ export function subscribeToRide(
       } as PresencePayload);
     }
   });
+
 
   activeChannel = channel;
   store.setChannel(channel);
@@ -119,4 +126,6 @@ export async function unsubscribeFromRide() {
     await supabase.removeChannel(activeChannel);
     activeChannel = null;
   }
+  // Clear the channel ref in locationService to stop broadcasts
+  setActiveChannel(null);
 }
