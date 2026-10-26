@@ -72,9 +72,8 @@ export function RoutePreviewMap({
       <div id="map"></div>
       <script>
         var map = L.map('map', { zoomControl: false });
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        L.tileLayer('https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_4uw2_1_70414a8f502607f82f75477d', {
           maxZoom: 19,
-          subdomains: 'abcd',
           attribution: '© OpenStreetMap, © CARTO'
         }).addTo(map);
 

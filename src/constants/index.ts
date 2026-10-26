@@ -38,3 +38,12 @@ export const SUPABASE_ANON_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4eWNydGtnYXdyeHl4enR0ZnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5NDc0MzksImV4cCI6MjEwODUyMzQzOX0.xHcg0hulzD98ZgoeQpRAQhqnIg1yhMma_-XUATEe49s';
 
+// Carto Basemap Tiles & API Key
+export const CARTO_API_KEY = 'cb1_4uw2_1_70414a8f502607f82f75477d';
+export const CARTO_TILES = {
+  VOYAGER: `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`,
+  DARK_MATTER: `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`,
+  VOYAGER_RETINA: `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+  DARK_RETINA: `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+} as const;
+

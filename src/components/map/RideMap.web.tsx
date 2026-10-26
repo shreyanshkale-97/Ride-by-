@@ -238,17 +238,35 @@ export const RideMap = forwardRef<any, RideMapProps>(({
       <div id="map"></div>
       
       <div class="map-controls">
+        <button class="control-btn" id="theme-btn" onclick="toggleMapTheme()">🗺 Voyager / Dark</button>
         <button class="control-btn" onclick="centerOnMe()">📍 My Location</button>
         <button class="control-btn" onclick="fitFullRoute()">🛣 Whole Route</button>
       </div>
 
       <script>
         var map = L.map('map', { zoomControl: false });
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+
+        var cartoKey = 'cb1_4uw2_1_70414a8f502607f82f75477d';
+        var darkTileUrl = 'https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=' + cartoKey;
+        var voyagerTileUrl = 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=' + cartoKey;
+
+        var isDarkTheme = false; // default to Carto Voyager
+        var currentTileLayer = L.tileLayer(voyagerTileUrl, {
           maxZoom: 19,
-          subdomains: 'abcd',
           attribution: '© OpenStreetMap, © CARTO'
         }).addTo(map);
+
+        window.toggleMapTheme = function() {
+          isDarkTheme = !isDarkTheme;
+          map.removeLayer(currentTileLayer);
+          currentTileLayer = L.tileLayer(isDarkTheme ? darkTileUrl : voyagerTileUrl, {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap, © CARTO'
+          }).addTo(map);
+          currentTileLayer.bringToBack();
+          var btn = document.getElementById('theme-btn');
+          if (btn) btn.innerText = isDarkTheme ? '☀️ Switch to Voyager' : '🌙 Switch to Dark';
+        };
 
         var bounds = L.latLngBounds([[${startLat}, ${startLng}], [${destLat}, ${destLng}]]);
 
