@@ -1,12 +1,30 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView,
-  TouchableOpacity, ActivityIndicator,
+  TouchableOpacity, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../src/services/supabase';
 import { useAuthStore } from '../../src/store/authStore';
 import { Ride } from '../../src/types';
+
+// ─── Design Tokens ────────────────────────────────────────────────────────────
+const C = {
+  bg:           '#0A0E1A',
+  surface:      '#12172B',
+  surface2:     '#1A2035',
+  surface3:     '#232B45',
+  border:       'rgba(255,255,255,0.08)',
+  primary:      '#FF6B35',
+  primaryLight: '#FF8C5A',
+  blue:         '#2563EB',
+  blueLight:    '#60A5FA',
+  green:        '#10B981',
+  red:          '#EF4444',
+  textPrimary:  '#F9FAFB',
+  textSecondary:'#9CA3AF',
+  textMuted:    '#4B5563',
+};
 
 export default function SummaryScreen() {
   const { rideId } = useLocalSearchParams<{ rideId: string }>();
@@ -56,78 +74,183 @@ export default function SummaryScreen() {
   };
 
   if (loading) return (
-    <View style={styles.center}><ActivityIndicator color="#FF6B35" size="large" /></View>
+    <View style={styles.center}>
+      <ActivityIndicator color={C.primary} size="large" />
+    </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.celebrationHeader}>
-        <Text style={styles.celebrationEmoji}>🏁</Text>
-        <Text style={styles.celebrationTitle}>Ride Complete!</Text>
-        <Text style={styles.celebrationSub}>{ride?.name}</Text>
-      </View>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-      <View style={styles.statsCard}>
-        <View style={styles.statRow}>
-          <View style={styles.stat}>
+        {/* ── CELEBRATION HERO ─────────────────────────────────── */}
+        <View style={styles.heroSection}>
+          <Text style={styles.heroEmoji}>🎉</Text>
+          <Text style={styles.heroTitle}>Ride Complete!</Text>
+          <Text style={styles.heroSubtitle}>{ride?.name}</Text>
+        </View>
+
+        {/* ── STATS GRID ────────────────────────────────────────── */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
             <Text style={styles.statEmoji}>⏱</Text>
             <Text style={styles.statValue}>{getDuration()}</Text>
             <Text style={styles.statLabel}>Duration</Text>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
+
+          <View style={styles.statCard}>
             <Text style={styles.statEmoji}>👥</Text>
             <Text style={styles.statValue}>{memberCount}</Text>
             <Text style={styles.statLabel}>Riders</Text>
           </View>
+
+          <View style={styles.statCard}>
+            <Text style={styles.statEmoji}>🛣</Text>
+            <Text style={styles.statValue}>
+              {ride?.total_distance ? `${ride.total_distance}` : '—'}
+            </Text>
+            <Text style={styles.statLabel}>km</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <Text style={styles.statEmoji}>⚡</Text>
+            <Text style={styles.statValue}>—</Text>
+            <Text style={styles.statLabel}>Avg Speed</Text>
+          </View>
         </View>
 
-        <View style={styles.routeSummary}>
-          <Text style={styles.routeLabel}>Route</Text>
-          <Text style={styles.routeText}>
-            {ride?.meeting_name} → {ride?.destination_name}
-          </Text>
-        </View>
-      </View>
+        {/* ── ROUTE RECAP ──────────────────────────────────────── */}
+        <View style={styles.routeCard}>
+          <Text style={styles.routeCardLabel}>ROUTE RECAP</Text>
 
-      <TouchableOpacity
-        style={styles.homeBtn}
-        onPress={() => router.replace('/(tabs)/home')}
-      >
-        <Text style={styles.homeBtnText}>Back to Home</Text>
-      </TouchableOpacity>
+          <View style={styles.routeRow}>
+            <View style={styles.routeDot} />
+            <Text style={styles.routePointText} numberOfLines={1}>
+              {ride?.meeting_name ?? 'Start'}
+            </Text>
+          </View>
+
+          <View style={styles.routeLine} />
+
+          <View style={styles.routeRow}>
+            <View style={[styles.routeDot, styles.routeDotDest]} />
+            <Text style={styles.routePointText} numberOfLines={1}>
+              {ride?.destination_name ?? 'Destination'}
+            </Text>
+          </View>
+        </View>
+
+        {/* ── BACK TO HOME ─────────────────────────────────────── */}
+        <TouchableOpacity
+          style={styles.homeBtn}
+          onPress={() => router.replace('/(tabs)/home')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.homeBtnText}>🏠  Back to Home</Text>
+        </TouchableOpacity>
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  celebrationHeader: {
-    backgroundColor: '#FF6B35', paddingVertical: 48, alignItems: 'center',
+  container: { flex: 1, backgroundColor: C.bg },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.bg },
+  scroll: { padding: 24, paddingTop: 0 },
+
+  // ── HERO ──────────────────────────────────────────────────────────
+  heroSection: {
+    alignItems: 'center',
+    paddingTop: 48,
+    paddingBottom: 36,
   },
-  celebrationEmoji: { fontSize: 64, marginBottom: 12 },
-  celebrationTitle: { fontSize: 30, fontWeight: '800', color: '#fff' },
-  celebrationSub: { fontSize: 16, color: 'rgba(255,255,255,0.85)', marginTop: 6 },
-  statsCard: {
-    backgroundColor: '#fff', margin: 20, borderRadius: 20,
-    padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+  heroEmoji: { fontSize: 72, marginBottom: 16 },
+  heroTitle: {
+    fontSize: 34, fontWeight: '800', color: C.textPrimary,
+    letterSpacing: -0.5, marginBottom: 6,
   },
-  statRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
-  stat: { flex: 1, alignItems: 'center' },
-  statEmoji: { fontSize: 32, marginBottom: 8 },
-  statValue: { fontSize: 32, fontWeight: '800', color: '#1a1a1a' },
-  statLabel: { fontSize: 13, color: '#888', marginTop: 4 },
-  statDivider: { width: 1, height: 60, backgroundColor: '#f0f0f0' },
-  routeSummary: {
-    borderTopWidth: 1, borderTopColor: '#f0f0f0', paddingTop: 20,
+  heroSubtitle: {
+    fontSize: 16, color: C.textSecondary, fontWeight: '500',
+    textAlign: 'center',
   },
-  routeLabel: { fontSize: 12, color: '#999', fontWeight: '600', letterSpacing: 1, marginBottom: 6 },
-  routeText: { fontSize: 16, fontWeight: '600', color: '#1a1a1a' },
+
+  // ── STATS GRID ────────────────────────────────────────────────────
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: '44%',
+    backgroundColor: C.surface2,
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  statEmoji: { fontSize: 28, marginBottom: 10 },
+  statValue: {
+    fontSize: 30, fontWeight: '800', color: C.textPrimary,
+    letterSpacing: -0.5,
+  },
+  statLabel: {
+    fontSize: 12, color: C.textSecondary, fontWeight: '600',
+    marginTop: 4, letterSpacing: 0.5,
+  },
+
+  // ── ROUTE CARD ────────────────────────────────────────────────────
+  routeCard: {
+    backgroundColor: C.surface,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  routeCardLabel: {
+    fontSize: 11, fontWeight: '800', color: C.textMuted,
+    letterSpacing: 1.5, marginBottom: 16,
+  },
+  routeRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  routeDot: {
+    width: 12, height: 12, borderRadius: 6,
+    backgroundColor: C.primary,
+  },
+  routeDotDest: { backgroundColor: C.green },
+  routePointText: { fontSize: 15, fontWeight: '700', color: C.textPrimary, flex: 1 },
+  routeLine: {
+    width: 2, height: 24,
+    backgroundColor: C.border,
+    marginLeft: 5, marginVertical: 4,
+  },
+
+  // ── HOME BUTTON ───────────────────────────────────────────────────
   homeBtn: {
-    backgroundColor: '#1a1a1a', borderRadius: 14, margin: 20,
-    padding: 18, alignItems: 'center',
+    backgroundColor: C.primary,
+    borderRadius: 16,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: C.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 8,
   },
-  homeBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  homeBtnText: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: 0.2 },
 });

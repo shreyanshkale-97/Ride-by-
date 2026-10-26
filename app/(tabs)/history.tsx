@@ -1,11 +1,25 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet,
-  SafeAreaView, ActivityIndicator, TouchableOpacity,
+  SafeAreaView, ActivityIndicator,
 } from 'react-native';
 import { useAuthStore } from '../../src/store/authStore';
 import { supabase } from '../../src/services/supabase';
 import { RideHistory } from '../../src/types';
+
+const C = {
+  bg: '#0A0E1A',
+  surface: '#12172B',
+  surface2: '#1A2035',
+  surface3: '#232B45',
+  border: 'rgba(255,255,255,0.08)',
+  primary: '#FF6B35',
+  primaryLight: '#FF8C5A',
+  green: '#10B981',
+  textPrimary: '#F9FAFB',
+  textSecondary: '#9CA3AF',
+  textMuted: '#6B7280',
+};
 
 export default function HistoryScreen() {
   const { user } = useAuthStore();
@@ -36,7 +50,7 @@ export default function HistoryScreen() {
 
   if (loading) return (
     <View style={styles.center}>
-      <ActivityIndicator color="#FF6B35" size="large" />
+      <ActivityIndicator color={C.primary} size="large" />
     </View>
   );
 
@@ -44,52 +58,59 @@ export default function HistoryScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Ride History</Text>
+        <Text style={styles.subtitle}>Your past adventures and group logs</Text>
       </View>
 
       {history.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>📋</Text>
-          <Text style={styles.emptyText}>No rides yet</Text>
-          <Text style={styles.emptySubtext}>Your completed rides will appear here</Text>
+          <View style={styles.emptyIconCircle}>
+            <Text style={styles.emptyIcon}>🏁</Text>
+          </View>
+          <Text style={styles.emptyText}>No rides logged yet</Text>
+          <Text style={styles.emptySubtext}>Once you complete or join a ride, telemetry summaries will appear here.</Text>
         </View>
       ) : (
         <FlatList
           data={history}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={{ padding: 18 }}
+          showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>{item.ride?.name ?? 'Ride'}</Text>
-                <Text style={styles.cardDate}>
-                  {new Date(item.created_at).toLocaleDateString('en-IN', {
-                    day: 'numeric', month: 'short', year: 'numeric'
-                  })}
-                </Text>
-              </View>
-
-              {item.ride && (
-                <Text style={styles.cardRoute}>
-                  {item.ride.meeting_name} → {item.ride.destination_name}
-                </Text>
-              )}
-
-              <View style={styles.stats}>
-                <View style={styles.stat}>
-                  <Text style={styles.statValue}>
-                    {item.total_distance ? `${item.total_distance.toFixed(1)} km` : '—'}
+              <View style={styles.accentBorder} />
+              <View style={styles.cardContent}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardTitle}>{item.ride?.name ?? 'Completed Ride'}</Text>
+                  <Text style={styles.cardDate}>
+                    {new Date(item.created_at).toLocaleDateString('en-IN', {
+                      day: 'numeric', month: 'short', year: 'numeric'
+                    })}
                   </Text>
-                  <Text style={styles.statLabel}>Distance</Text>
                 </View>
-                <View style={styles.statDivider} />
-                <View style={styles.stat}>
-                  <Text style={styles.statValue}>{formatDuration(item.duration_min)}</Text>
-                  <Text style={styles.statLabel}>Duration</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.stat}>
-                  <Text style={styles.statValue}>{item.member_count ?? '—'}</Text>
-                  <Text style={styles.statLabel}>Riders</Text>
+
+                {item.ride && (
+                  <Text style={styles.cardRoute}>
+                    📍 {item.ride.meeting_name} → 🏁 {item.ride.destination_name}
+                  </Text>
+                )}
+
+                <View style={styles.stats}>
+                  <View style={styles.stat}>
+                    <Text style={styles.statValue}>
+                      {item.total_distance ? `${item.total_distance.toFixed(1)} km` : '—'}
+                    </Text>
+                    <Text style={styles.statLabel}>Distance</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.stat}>
+                    <Text style={styles.statValue}>{formatDuration(item.duration_min)}</Text>
+                    <Text style={styles.statLabel}>Duration</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.stat}>
+                    <Text style={styles.statValue}>{item.member_count ?? '1'}</Text>
+                    <Text style={styles.statLabel}>Riders</Text>
+                  </View>
                 </View>
               </View>
             </View>
@@ -101,30 +122,137 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  container: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: C.bg,
+  },
   header: {
-    backgroundColor: '#fff', padding: 20, paddingTop: 24,
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
   },
-  title: { fontSize: 24, fontWeight: '700', color: '#1a1a1a' },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyIcon: { fontSize: 48, marginBottom: 12 },
-  emptyText: { fontSize: 18, fontWeight: '600', color: '#666' },
-  emptySubtext: { fontSize: 14, color: '#999', marginTop: 4 },
+  title: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: C.textPrimary,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: C.textSecondary,
+    marginTop: 4,
+  },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: C.surface2,
+    borderWidth: 1,
+    borderColor: C.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  emptyIcon: {
+    fontSize: 38,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: C.textPrimary,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    color: C.textSecondary,
+    marginTop: 6,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
   card: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 16,
-    marginBottom: 12, shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06,
-    shadowRadius: 4, elevation: 2,
+    backgroundColor: C.surface,
+    borderRadius: 18,
+    marginBottom: 14,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  cardTitle: { fontSize: 17, fontWeight: '700', color: '#1a1a1a', flex: 1 },
-  cardDate: { fontSize: 12, color: '#999' },
-  cardRoute: { fontSize: 13, color: '#666', marginTop: 4, marginBottom: 16 },
-  stats: { flexDirection: 'row', alignItems: 'center' },
-  stat: { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 18, fontWeight: '700', color: '#FF6B35' },
-  statLabel: { fontSize: 11, color: '#999', marginTop: 2 },
-  statDivider: { width: 1, height: 30, backgroundColor: '#f0f0f0' },
+  accentBorder: {
+    width: 4,
+    backgroundColor: C.primary,
+  },
+  cardContent: {
+    flex: 1,
+    padding: 16,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: C.textPrimary,
+    flex: 1,
+  },
+  cardDate: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: C.textMuted,
+    marginLeft: 8,
+  },
+  cardRoute: {
+    fontSize: 13,
+    color: C.textSecondary,
+    marginTop: 6,
+    marginBottom: 16,
+  },
+  stats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.surface2,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  stat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: C.primaryLight,
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: C.textMuted,
+    marginTop: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: C.border,
+  },
 });

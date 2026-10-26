@@ -138,8 +138,8 @@ export function LocationPickerModal({
       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
       <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
       <style>
-        body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; font-family: sans-serif; }
-        .leaflet-container { width: 100%; height: 100%; cursor: crosshair !important; }
+        body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; font-family: sans-serif; background: #0A0E1A; }
+        .leaflet-container { width: 100%; height: 100%; cursor: crosshair !important; background: #0A0E1A; }
       </style>
     </head>
     <body>
@@ -147,11 +147,12 @@ export function LocationPickerModal({
       <script>
         var lat = ${selectedLat};
         var lng = ${selectedLng};
-        var map = L.map('map').setView([lat, lng], 14);
+        var map = L.map('map', { zoomControl: false }).setView([lat, lng], 14);
 
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
           maxZoom: 19,
-          attribution: '© OpenStreetMap'
+          subdomains: 'abcd',
+          attribution: '© OpenStreetMap, © CARTO'
         }).addTo(map);
 
         var marker = L.marker([lat, lng], { draggable: true }).addTo(map);
@@ -273,36 +274,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 12,
-    backgroundColor: '#fff',
+    backgroundColor: '#12172B',
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
-  closeBtn: { padding: 6 },
-  closeBtnText: { fontSize: 15, color: '#666', fontWeight: '600' },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#1a1a1a' },
+  closeBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#1A2035',
+    borderRadius: 8,
+  },
+  closeBtnText: { fontSize: 13, color: '#F9FAFB', fontWeight: '700' },
+  headerTitle: { fontSize: 16, fontWeight: '800', color: '#F9FAFB' },
   gpsBtn: {
-    backgroundColor: '#fff8f3',
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
     borderWidth: 1,
     borderColor: '#FF6B35',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  gpsBtnText: { color: '#FF6B35', fontSize: 13, fontWeight: '700' },
+  gpsBtnText: { color: '#FF6B35', fontSize: 12, fontWeight: '800' },
 
   searchContainer: {
     padding: 12,
-    backgroundColor: '#fff',
+    backgroundColor: '#12172B',
     position: 'relative',
     zIndex: 10,
   },
   searchInput: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#1A2035',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    fontSize: 15,
-    color: '#1a1a1a',
+    fontSize: 14,
+    color: '#F9FAFB',
   },
   searchSpinner: {
     position: 'absolute',
@@ -314,60 +322,67 @@ const styles = StyleSheet.create({
     top: 110,
     left: 12,
     right: 12,
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: '#1A2035',
+    borderRadius: 14,
     maxHeight: 220,
     zIndex: 100,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
     elevation: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   resultItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
   },
   resultIcon: { fontSize: 18, marginRight: 8 },
-  resultText: { fontSize: 14, color: '#374151', flex: 1 },
+  resultText: { fontSize: 13, color: '#F9FAFB', flex: 1, fontWeight: '600' },
 
-  mapWrapper: { flex: 1, position: 'relative' },
+  mapWrapper: { flex: 1, position: 'relative', backgroundColor: '#0A0E1A' },
   mapTip: {
     position: 'absolute',
     bottom: 12,
     alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: 'rgba(18, 23, 43, 0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
   },
-  mapTipText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  mapTipText: { color: '#F9FAFB', fontSize: 12, fontWeight: '700' },
 
   bottomBar: {
-    backgroundColor: '#fff',
+    backgroundColor: '#12172B',
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
   },
   locationInfo: { marginBottom: 12 },
-  locationLabel: { fontSize: 12, color: '#6b7280', fontWeight: '600', textTransform: 'uppercase' },
-  locationName: { fontSize: 15, fontWeight: '700', color: '#1a1a1a', marginTop: 2 },
-  coordsText: { fontSize: 12, color: '#9ca3af', marginTop: 3 },
+  locationLabel: { fontSize: 11, color: '#60A5FA', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  locationName: { fontSize: 15, fontWeight: '800', color: '#F9FAFB', marginTop: 2 },
+  coordsText: { fontSize: 11, color: '#9CA3AF', marginTop: 3 },
   confirmBtn: {
     backgroundColor: '#FF6B35',
-    borderRadius: 12,
-    paddingVertical: 14,
+    borderRadius: 14,
+    paddingVertical: 15,
     alignItems: 'center',
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 });
+

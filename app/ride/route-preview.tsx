@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  SafeAreaView, ActivityIndicator, Alert, ScrollView,
-  TextInput,
+  SafeAreaView, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
@@ -12,6 +11,22 @@ import {
 import { RoutePreviewMap } from '../../src/components/map/RoutePreviewMap';
 import { useAuthStore } from '../../src/store/authStore';
 import { useRideStore } from '../../src/store/rideStore';
+
+const C = {
+  bg: '#0A0E1A',
+  surface: '#12172B',
+  surface2: '#1A2035',
+  surface3: '#232B45',
+  border: 'rgba(255,255,255,0.08)',
+  primary: '#FF6B35',
+  primaryLight: '#FF8C5A',
+  blue: '#2563EB',
+  blueLight: '#60A5FA',
+  green: '#10B981',
+  textPrimary: '#F9FAFB',
+  textSecondary: '#9CA3AF',
+  textMuted: '#6B7280',
+};
 
 type ActiveTab = 'routes' | 'fuel' | 'cafe' | 'rest_stop';
 
@@ -44,9 +59,7 @@ export default function RoutePreviewScreen() {
     cafe: [],
     rest_stop: [],
   });
-  const [loadingStops, setLoadingStops] = useState(false);
   const [loadingRoutes, setLoadingRoutes] = useState(true);
-  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     loadInitialData();
@@ -121,25 +134,23 @@ export default function RoutePreviewScreen() {
       {/* Top Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Edit</Text>
+          <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle} numberOfLines={1}>{params.name || 'Route Navigation'}</Text>
-          <Text style={styles.headerSub}>
-            {selectedStops.length > 0
-              ? `${selectedStops.length} stop${selectedStops.length > 1 ? 's' : ''} added`
-              : 'Add optional stops along the route'}
-          </Text>
+          <View style={styles.stepBadge}>
+            <Text style={styles.stepBadgeText}>STEP 2 OF 3</Text>
+          </View>
+          <Text style={styles.headerTitle} numberOfLines={1}>{params.name || 'Choose Route'}</Text>
         </View>
-        <View style={{ width: 60 }} />
+        <View style={{ width: 50 }} />
       </View>
 
       {/* Main Map View */}
       <View style={styles.mapContainer}>
         {loadingRoutes ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#FF6B35" />
-            <Text style={styles.loadingText}>Recalculating route & navigation...</Text>
+            <ActivityIndicator size="large" color={C.primary} />
+            <Text style={styles.loadingText}>Recalculating live OSRM navigation...</Text>
           </View>
         ) : (
           <RoutePreviewMap
@@ -156,7 +167,7 @@ export default function RoutePreviewScreen() {
         {/* Selected Stops Floating Chips */}
         {selectedStops.length > 0 && (
           <View style={styles.floatingStopsList}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12 }}>
               {selectedStops.map((s) => (
                 <View key={s.id} style={styles.stopChip}>
                   <Text style={styles.stopChipText}>
@@ -185,12 +196,12 @@ export default function RoutePreviewScreen() {
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={styles.statVal}>{selectedRoute.durationText}</Text>
-                <Text style={styles.statLbl}>Duration</Text>
+                <Text style={styles.statLbl}>Estimated Time</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={styles.statVal}>{selectedStops.length}</Text>
-                <Text style={styles.statLbl}>Stops</Text>
+                <Text style={styles.statLbl}>Stops Added</Text>
               </View>
             </View>
           </View>
@@ -203,7 +214,7 @@ export default function RoutePreviewScreen() {
             onPress={() => setActiveTab('routes')}
           >
             <Text style={[styles.tabText, activeTab === 'routes' && styles.tabTextActive]}>
-              🗺 Routes
+              🗺 Routes ({routes.length})
             </Text>
           </TouchableOpacity>
 
@@ -237,7 +248,7 @@ export default function RoutePreviewScreen() {
 
         {/* Tab Content */}
         {activeTab === 'routes' ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollSection}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollSection} contentContainerStyle={{ paddingHorizontal: 16 }}>
             {routes.map((route, i) => {
               const isSelected = route.id === selectedRouteId;
               return (
@@ -245,10 +256,11 @@ export default function RoutePreviewScreen() {
                   key={route.id}
                   style={[styles.routeCard, isSelected && styles.routeCardSelected]}
                   onPress={() => setSelectedRouteId(route.id)}
+                  activeOpacity={0.8}
                 >
                   <View style={styles.cardHeader}>
                     <Text style={[styles.cardTag, isSelected && styles.cardTagSelected]}>
-                      {i === 0 ? 'RECOMMENDED' : `OPTION ${i + 1}`}
+                      {i === 0 ? 'FASTEST' : `ALT ${i}`}
                     </Text>
                     {isSelected && <Text style={styles.checkMark}>✓</Text>}
                   </View>
@@ -261,7 +273,7 @@ export default function RoutePreviewScreen() {
             })}
           </ScrollView>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollSection}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollSection} contentContainerStyle={{ paddingHorizontal: 16 }}>
             {suggestedStops[activeTab].map((stop) => {
               const isAdded = selectedStops.some((s) => s.id === stop.id);
               const emoji = activeTab === 'fuel' ? '⛽' : activeTab === 'cafe' ? '☕' : '🛑';
@@ -277,7 +289,7 @@ export default function RoutePreviewScreen() {
                     onPress={() => handleToggleStop(stop)}
                   >
                     <Text style={[styles.addStopBtnText, isAdded && styles.addStopBtnTextAdded]}>
-                      {isAdded ? '✓ Added to Route' : '+ Add to Route'}
+                      {isAdded ? '✓ Added' : '+ Add Stop'}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -291,8 +303,9 @@ export default function RoutePreviewScreen() {
           style={[styles.confirmBtn, loadingRoutes && styles.btnDisabled]}
           onPress={handleProceedToSettings}
           disabled={loadingRoutes}
+          activeOpacity={0.85}
         >
-          <Text style={styles.confirmBtnText}>Next: Ride Details & Rules ⚙️ →</Text>
+          <Text style={styles.confirmBtnText}>Continue to Details & Rules →</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -300,151 +313,246 @@ export default function RoutePreviewScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    backgroundColor: C.surface,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: C.border,
   },
-  backBtn: { padding: 4 },
-  backText: { fontSize: 16, color: '#FF6B35', fontWeight: '600' },
-  headerTitleContainer: { alignItems: 'center', flex: 1 },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: '#1a1a1a' },
-  headerSub: { fontSize: 12, color: '#666', marginTop: 1 },
-
-  mapContainer: { flex: 1, position: 'relative' },
+  backBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: C.surface2,
+    borderRadius: 8,
+  },
+  backText: {
+    fontSize: 13,
+    color: C.textPrimary,
+    fontWeight: '700',
+  },
+  headerTitleContainer: {
+    alignItems: 'center',
+  },
+  stepBadge: {
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginBottom: 2,
+  },
+  stepBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: C.primary,
+    letterSpacing: 0.8,
+  },
+  headerTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: C.textPrimary,
+  },
+  mapContainer: {
+    flex: 1,
+    position: 'relative',
+    backgroundColor: '#000',
+  },
   loadingBox: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: C.bg,
+    gap: 12,
   },
-  loadingText: { marginTop: 12, fontSize: 15, color: '#6b7280', fontWeight: '500' },
-
+  loadingText: {
+    color: C.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
   floatingStopsList: {
     position: 'absolute',
     top: 12,
-    left: 12,
-    right: 12,
-    zIndex: 50,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
   stopChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: 'rgba(18, 23, 43, 0.94)',
+    borderWidth: 1,
+    borderColor: C.green,
     borderRadius: 20,
     paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingLeft: 12,
+    paddingRight: 6,
     marginRight: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
-  stopChipText: { fontSize: 13, fontWeight: '700', color: '#1f2937' },
-  chipRemoveBtn: { marginLeft: 8, padding: 2 },
-  chipRemoveText: { color: '#ef4444', fontWeight: '800', fontSize: 12 },
-
+  stopChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.textPrimary,
+    marginRight: 6,
+  },
+  chipRemoveBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chipRemoveText: {
+    color: '#EF4444',
+    fontSize: 10,
+    fontWeight: '800',
+  },
   bottomCard: {
-    backgroundColor: '#fff',
-    padding: 16,
-    paddingBottom: 24,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: C.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingVertical: 14,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
   },
   summaryBar: {
-    backgroundColor: '#fff8f3',
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: '#FF6B35',
+    paddingHorizontal: 16,
+    marginBottom: 12,
   },
-  summaryStatsRow: { flexDirection: 'row', alignItems: 'center' },
-  statItem: { flex: 1, alignItems: 'center' },
-  statVal: { fontSize: 18, fontWeight: '800', color: '#1a1a1a' },
-  statLbl: { fontSize: 11, color: '#6b7280', marginTop: 1 },
-  statDivider: { width: 1, height: 24, backgroundColor: '#fed7aa' },
-
+  summaryStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.surface2,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statVal: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: C.primary,
+  },
+  statLbl: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: C.textMuted,
+    marginTop: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: C.border,
+  },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    padding: 3,
+    paddingHorizontal: 16,
+    gap: 8,
     marginBottom: 12,
   },
   tabBtn: {
     flex: 1,
     paddingVertical: 8,
-    alignItems: 'center',
+    backgroundColor: C.surface2,
     borderRadius: 10,
-  },
-  tabBtnActive: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  tabText: { fontSize: 13, fontWeight: '600', color: '#6b7280' },
-  tabTextActive: { color: '#FF6B35', fontWeight: '800' },
-
-  scrollSection: { marginBottom: 14, minHeight: 90 },
-
-  // Route Cards
-  routeCard: {
-    width: 170,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    padding: 12,
-    marginRight: 10,
-    borderWidth: 2,
+    alignItems: 'center',
+    borderWidth: 1,
     borderColor: 'transparent',
   },
+  tabBtnActive: {
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
+    borderColor: C.primary,
+  },
+  tabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: C.textMuted,
+  },
+  tabTextActive: {
+    color: C.primary,
+    fontWeight: '800',
+  },
+  scrollSection: {
+    marginBottom: 14,
+  },
+  routeCard: {
+    width: 180,
+    backgroundColor: C.surface2,
+    borderRadius: 14,
+    padding: 12,
+    marginRight: 10,
+    borderWidth: 1.5,
+    borderColor: C.border,
+  },
   routeCardSelected: {
-    backgroundColor: '#fff',
-    borderColor: '#FF6B35',
+    borderColor: C.primary,
+    backgroundColor: C.surface3,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  cardTag: { fontSize: 10, fontWeight: '800', color: '#6b7280' },
-  cardTagSelected: { color: '#FF6B35' },
-  checkMark: { color: '#FF6B35', fontWeight: '900', fontSize: 14 },
-  cardName: { fontSize: 13, fontWeight: '700', color: '#1a1a1a' },
-  cardMetrics: { fontSize: 12, color: '#4b5563', marginTop: 3 },
-
-  // Stop Cards
+  cardTag: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: C.textMuted,
+    letterSpacing: 0.6,
+  },
+  cardTagSelected: {
+    color: C.primary,
+  },
+  checkMark: {
+    color: C.primary,
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  cardName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: C.textPrimary,
+  },
+  cardMetrics: {
+    fontSize: 11,
+    color: C.textSecondary,
+    marginTop: 4,
+    fontWeight: '600',
+  },
   stopCard: {
     width: 200,
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
+    backgroundColor: C.surface2,
+    borderRadius: 14,
     padding: 12,
     marginRight: 10,
-    borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderWidth: 1,
+    borderColor: C.border,
     justifyContent: 'space-between',
   },
   stopCardAdded: {
-    borderColor: '#10b981',
-    backgroundColor: '#ecfdf5',
+    borderColor: C.green,
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
   },
   stopCardHeader: {
     flexDirection: 'row',
@@ -452,47 +560,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  stopEmoji: { fontSize: 20 },
+  stopEmoji: {
+    fontSize: 18,
+  },
   stopCategoryBadge: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#6b7280',
+    color: C.textMuted,
     letterSpacing: 0.5,
   },
   stopCardTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#1f2937',
+    color: C.textPrimary,
     marginBottom: 10,
-    lineHeight: 18,
+    lineHeight: 16,
   },
   addStopBtn: {
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#FF6B35',
+    backgroundColor: C.surface3,
+    borderWidth: 1,
+    borderColor: C.border,
     borderRadius: 8,
-    paddingVertical: 6,
+    paddingVertical: 7,
     alignItems: 'center',
   },
   addStopBtnAdded: {
-    backgroundColor: '#10b981',
-    borderColor: '#10b981',
+    backgroundColor: C.green,
+    borderColor: C.green,
   },
   addStopBtnText: {
-    color: '#FF6B35',
-    fontSize: 12,
+    color: C.textPrimary,
+    fontSize: 11,
     fontWeight: '700',
   },
   addStopBtnTextAdded: {
     color: '#fff',
   },
-
   confirmBtn: {
-    backgroundColor: '#FF6B35',
+    backgroundColor: C.primary,
     borderRadius: 14,
     paddingVertical: 16,
+    marginHorizontal: 16,
     alignItems: 'center',
+    shadowColor: C.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  btnDisabled: { opacity: 0.6 },
-  confirmBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  confirmBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
 });

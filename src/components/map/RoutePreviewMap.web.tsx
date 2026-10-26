@@ -51,20 +51,31 @@ export function RoutePreviewMap({
       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
       <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
       <style>
-        body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; font-family: sans-serif; }
+        body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; font-family: sans-serif; background: #0A0E1A; }
         .custom-div-icon {
           background-color: transparent;
           border: none;
+        }
+        .leaflet-popup-content-wrapper {
+          background: #12172B !important;
+          color: #F9FAFB !important;
+          border: 1px solid rgba(255, 255, 255, 0.12) !important;
+          border-radius: 12px !important;
+          box-shadow: 0 6px 18px rgba(0,0,0,0.5) !important;
+        }
+        .leaflet-popup-tip {
+          background: #12172B !important;
         }
       </style>
     </head>
     <body>
       <div id="map"></div>
       <script>
-        var map = L.map('map');
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        var map = L.map('map', { zoomControl: false });
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
           maxZoom: 19,
-          attribution: '© OpenStreetMap'
+          subdomains: 'abcd',
+          attribution: '© OpenStreetMap, © CARTO'
         }).addTo(map);
 
         var bounds = L.latLngBounds([[${startLat}, ${startLng}], [${destLat}, ${destLng}]]);

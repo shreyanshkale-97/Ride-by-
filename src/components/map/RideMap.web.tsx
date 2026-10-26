@@ -195,6 +195,18 @@ export const RideMap = forwardRef<any, RideMapProps>(({
           font-size: 14px;
         }
 
+        /* Dark Popup Styling */
+        .leaflet-popup-content-wrapper {
+          background: #12172B !important;
+          color: #F9FAFB !important;
+          border: 1px solid rgba(255, 255, 255, 0.12) !important;
+          border-radius: 14px !important;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
+        }
+        .leaflet-popup-tip {
+          background: #12172B !important;
+        }
+
         /* Map Controls Overlay */
         .map-controls {
           position: absolute;
@@ -206,20 +218,20 @@ export const RideMap = forwardRef<any, RideMapProps>(({
           gap: 8px;
         }
         .control-btn {
-          background: #ffffff;
-          border: 1px solid #d1d5db;
+          background: #12172B;
+          border: 1px solid rgba(255, 255, 255, 0.15);
           border-radius: 10px;
           padding: 8px 12px;
           font-size: 13px;
           font-weight: 700;
-          color: #1f2937;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+          color: #F9FAFB;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.4);
           cursor: pointer;
           display: flex;
           align-items: center;
           gap: 6px;
         }
-        .control-btn:hover { background: #f3f4f6; }
+        .control-btn:hover { background: #1A2035; }
       </style>
     </head>
     <body>
@@ -231,10 +243,11 @@ export const RideMap = forwardRef<any, RideMapProps>(({
       </div>
 
       <script>
-        var map = L.map('map', { zoomControl: true });
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        var map = L.map('map', { zoomControl: false });
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
           maxZoom: 19,
-          attribution: '© OpenStreetMap'
+          subdomains: 'abcd',
+          attribution: '© OpenStreetMap, © CARTO'
         }).addTo(map);
 
         var bounds = L.latLngBounds([[${startLat}, ${startLng}], [${destLat}, ${destLng}]]);

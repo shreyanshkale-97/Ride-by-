@@ -11,6 +11,21 @@ import { generateRideCode } from '../../src/utils/location';
 import { RideStop } from '../../src/services/routingService';
 import { showAppAlert } from '../../src/utils/alert';
 
+const C = {
+  bg: '#0A0E1A',
+  surface: '#12172B',
+  surface2: '#1A2035',
+  surface3: '#232B45',
+  border: 'rgba(255,255,255,0.08)',
+  primary: '#FF6B35',
+  primaryLight: '#FF8C5A',
+  green: '#10B981',
+  blue: '#2563EB',
+  textPrimary: '#F9FAFB',
+  textSecondary: '#9CA3AF',
+  textMuted: '#6B7280',
+};
+
 export default function RideSettingsScreen() {
   const params = useLocalSearchParams<{
     name: string;
@@ -118,14 +133,16 @@ export default function RideSettingsScreen() {
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Ride Settings & Rules</Text>
-          <Text style={styles.headerSub}>Step 3 of 3</Text>
+          <View style={styles.stepBadge}>
+            <Text style={styles.stepBadgeText}>FINAL STEP 3 OF 3</Text>
+          </View>
+          <Text style={styles.headerTitle}>Details & Guidelines</Text>
         </View>
-        <View style={{ width: 60 }} />
+        <View style={{ width: 50 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Route Summary Pill */}
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {/* Route Summary Card */}
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>{params.name}</Text>
           <Text style={styles.summaryRoute}>
@@ -141,29 +158,30 @@ export default function RideSettingsScreen() {
         </View>
 
         {/* 1. RIDE CODE SECTION */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>🔑 Generated Ride Code</Text>
+        <View style={styles.cardSection}>
+          <Text style={styles.sectionLabel}>🔑 RIDE ACCESS CODE</Text>
           <Text style={styles.sectionHint}>
-            Friends will enter this 6-character code to join your ride
+            Friends will enter this unique code to join your pack lobby.
           </Text>
           <View style={styles.codeContainer}>
             <Text style={styles.codeDisplay}>{rideCode}</Text>
-            <TouchableOpacity onPress={handleRegenerateCode} style={styles.regenBtn}>
-              <Text style={styles.regenBtnText}>🔄 Change</Text>
+            <TouchableOpacity onPress={handleRegenerateCode} style={styles.regenBtn} activeOpacity={0.8}>
+              <Text style={styles.regenBtnText}>🔄 Generate New</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* 2. MAX MEMBERS */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>👥 Maximum Members Allowed</Text>
-          <Text style={styles.sectionHint}>Limit group size for coordination & safety</Text>
+        <View style={styles.cardSection}>
+          <Text style={styles.sectionLabel}>👥 PACK CAPACITY LIMIT</Text>
+          <Text style={styles.sectionHint}>Cap group size for maximum formation safety.</Text>
           <View style={styles.memberPillsRow}>
             {[5, 10, 15, 20].map((num) => (
               <TouchableOpacity
                 key={num}
                 style={[styles.memberPill, maxMembers === num && styles.memberPillActive]}
                 onPress={() => setMaxMembers(num)}
+                activeOpacity={0.8}
               >
                 <Text style={[styles.memberPillText, maxMembers === num && styles.memberPillTextActive]}>
                   {num} Riders
@@ -174,55 +192,61 @@ export default function RideSettingsScreen() {
         </View>
 
         {/* 3. DATES & TIMINGS */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>📅 Ride Schedule & Deadlines</Text>
+        <View style={styles.cardSection}>
+          <Text style={styles.sectionLabel}>📅 SCHEDULE & TIMELINE</Text>
 
           {/* Start Date & Time */}
-          <Text style={styles.subLabel}>🚀 Ride Starts:</Text>
+          <Text style={styles.subLabel}>🚀 Meet & Rollout</Text>
           <View style={styles.row}>
             <TextInput
               style={[styles.input, styles.halfInput]}
               placeholder="YYYY-MM-DD"
+              placeholderTextColor={C.textMuted}
               value={startDate}
               onChangeText={setStartDate}
             />
             <TextInput
               style={[styles.input, styles.halfInput]}
               placeholder="06:00 AM"
+              placeholderTextColor={C.textMuted}
               value={startTime}
               onChangeText={setStartTime}
             />
           </View>
 
           {/* End Date & Time */}
-          <Text style={styles.subLabel}>🏁 Expected Finish:</Text>
+          <Text style={styles.subLabel}>🏁 Target Arrival</Text>
           <View style={styles.row}>
             <TextInput
               style={[styles.input, styles.halfInput]}
               placeholder="YYYY-MM-DD"
+              placeholderTextColor={C.textMuted}
               value={endDate}
               onChangeText={setEndDate}
             />
             <TextInput
               style={[styles.input, styles.halfInput]}
               placeholder="06:00 PM"
+              placeholderTextColor={C.textMuted}
               value={endTime}
               onChangeText={setEndTime}
             />
           </View>
 
           {/* Last Date/Time to Join */}
-          <Text style={styles.subLabel}>⏰ Last Date & Time to Join (Join Deadline):</Text>
+          <Text style={styles.subLabel}>⏰ Join Cutoff Deadline</Text>
           <View style={styles.row}>
             <TextInput
               style={[styles.input, styles.halfInput]}
               placeholder="YYYY-MM-DD"
+              placeholderTextColor={C.textMuted}
               value={joinDeadlineDate}
               onChangeText={setJoinDeadlineDate}
             />
             <TextInput
               style={[styles.input, styles.halfInput]}
               placeholder="04:00 AM"
+              placeholderTextColor={C.textMuted}
               value={joinDeadlineTime}
               onChangeText={setJoinDeadlineTime}
             />
@@ -230,26 +254,26 @@ export default function RideSettingsScreen() {
         </View>
 
         {/* 4. ESTIMATED COST */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>💰 Estimated Total Cost (Optional)</Text>
-          <Text style={styles.sectionHint}>Approximate budget for fuel, food, and tolls</Text>
+        <View style={styles.cardSection}>
+          <Text style={styles.sectionLabel}>💰 ESTIMATED BUDGET (OPTIONAL)</Text>
+          <Text style={styles.sectionHint}>Estimated split per rider for fuel, food, and tolls.</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. ₹1,500 / person or ₹5,000 total"
-            placeholderTextColor="#999"
+            placeholder="e.g. ₹1,500 / rider"
+            placeholderTextColor={C.textMuted}
             value={estimatedCost}
             onChangeText={setEstimatedCost}
           />
         </View>
 
         {/* 5. RIDE DESCRIPTION & RULES */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>📝 Ride Description & Guidelines</Text>
-          <Text style={styles.sectionHint}>Notes, required gear, cruising speed, and instructions</Text>
+        <View style={styles.cardSection}>
+          <Text style={styles.sectionLabel}>📝 RIDE RULES & GEAR REQUIREMENT</Text>
+          <Text style={styles.sectionHint}>Safety notes, mandatory riding gear, staggered formation instructions.</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
             placeholder="Write guidelines, required gear, pace, notes..."
-            placeholderTextColor="#999"
+            placeholderTextColor={C.textMuted}
             value={description}
             onChangeText={setDescription}
             multiline
@@ -262,11 +286,12 @@ export default function RideSettingsScreen() {
           style={[styles.createBtn, creating && styles.btnDisabled]}
           onPress={handleCreateRide}
           disabled={creating}
+          activeOpacity={0.85}
         >
           {creating ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.createBtnText}>🚀 Create Ride & Open Dashboard</Text>
+            <Text style={styles.createBtnText}>🚀 Launch Ride & Open Dashboard</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -275,123 +300,216 @@ export default function RideSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    backgroundColor: C.surface,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: C.border,
   },
-  backBtn: { padding: 4 },
-  backText: { fontSize: 16, color: '#FF6B35', fontWeight: '600' },
-  headerTitleContainer: { alignItems: 'center', flex: 1 },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#1a1a1a' },
-  headerSub: { fontSize: 12, color: '#666', marginTop: 1 },
-  content: { padding: 16, paddingBottom: 40 },
-
-  summaryCard: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  summaryTitle: { fontSize: 18, fontWeight: '800', color: '#1a1a1a' },
-  summaryRoute: { fontSize: 14, color: '#4b5563', marginTop: 4, marginBottom: 10 },
-  summaryMetricsRow: { flexDirection: 'row', gap: 8 },
-  metricBadge: {
-    backgroundColor: '#fff8f3',
-    color: '#FF6B35',
-    fontSize: 12,
-    fontWeight: '700',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+  backBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: C.surface2,
     borderRadius: 8,
   },
-
-  section: { marginBottom: 22 },
-  sectionLabel: { fontSize: 16, fontWeight: '700', color: '#1a1a1a', marginBottom: 4 },
-  sectionHint: { fontSize: 13, color: '#6b7280', marginBottom: 10 },
-  subLabel: { fontSize: 13, fontWeight: '600', color: '#374151', marginTop: 8, marginBottom: 4 },
-
+  backText: {
+    fontSize: 13,
+    color: C.textPrimary,
+    fontWeight: '700',
+  },
+  headerTitleContainer: {
+    alignItems: 'center',
+  },
+  stepBadge: {
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginBottom: 2,
+  },
+  stepBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: C.primary,
+    letterSpacing: 0.8,
+  },
+  headerTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: C.textPrimary,
+  },
+  content: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  summaryCard: {
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: C.textPrimary,
+  },
+  summaryRoute: {
+    fontSize: 13,
+    color: C.textSecondary,
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  summaryMetricsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  metricBadge: {
+    backgroundColor: C.surface2,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.primaryLight,
+  },
+  cardSection: {
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: C.primaryLight,
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: C.textSecondary,
+    marginBottom: 14,
+    lineHeight: 16,
+  },
+  subLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.textPrimary,
+    marginTop: 8,
+    marginBottom: 6,
+  },
   codeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff8f3',
-    borderWidth: 2,
-    borderColor: '#FF6B35',
+    backgroundColor: C.surface2,
+    borderWidth: 1.5,
+    borderColor: C.primary,
     borderRadius: 14,
-    padding: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   codeDisplay: {
     fontSize: 28,
     fontWeight: '900',
-    letterSpacing: 4,
-    color: '#1a1a1a',
+    letterSpacing: 5,
+    color: C.primary,
+    fontFamily: 'monospace',
   },
   regenBtn: {
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
     borderWidth: 1,
-    borderColor: '#FF6B35',
+    borderColor: C.primary,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  regenBtnText: { color: '#FF6B35', fontWeight: '700', fontSize: 13 },
-
-  memberPillsRow: { flexDirection: 'row', gap: 8 },
+  regenBtnText: {
+    color: C.primaryLight,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  memberPillsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   memberPill: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    backgroundColor: C.surface2,
+    borderWidth: 1,
+    borderColor: C.border,
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
   },
   memberPillActive: {
-    borderColor: '#FF6B35',
-    backgroundColor: '#fff8f3',
+    borderColor: C.primary,
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
   },
-  memberPillText: { fontSize: 13, fontWeight: '600', color: '#4b5563' },
-  memberPillTextActive: { color: '#FF6B35', fontWeight: '800' },
-
+  memberPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: C.textMuted,
+  },
+  memberPillTextActive: {
+    color: C.primary,
+    fontWeight: '800',
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 8,
+  },
+  halfInput: {
+    flex: 1,
+  },
   input: {
-    borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    backgroundColor: C.surface2,
+    borderWidth: 1,
+    borderColor: C.border,
     borderRadius: 12,
-    padding: 12,
-    fontSize: 15,
-    color: '#1a1a1a',
-    backgroundColor: '#fff',
+    padding: 13,
+    fontSize: 14,
+    color: C.textPrimary,
   },
-  row: { flexDirection: 'row', gap: 10, marginBottom: 8 },
-  halfInput: { flex: 1 },
-  textArea: { height: 90, textAlignVertical: 'top' },
-
+  textArea: {
+    height: 86,
+    textAlignVertical: 'top',
+  },
   createBtn: {
-    backgroundColor: '#FF6B35',
+    backgroundColor: C.primary,
     borderRadius: 14,
     paddingVertical: 18,
     alignItems: 'center',
-    marginTop: 10,
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    marginTop: 8,
+    shadowColor: C.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 8,
   },
-  btnDisabled: { opacity: 0.6 },
-  createBtnText: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  createBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
 });

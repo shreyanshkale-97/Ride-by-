@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, ActivityIndicator,
+  SafeAreaView, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../../src/services/supabase';
@@ -10,13 +10,29 @@ import { useRideStore } from '../../src/store/rideStore';
 import { RidePreview } from '../../src/types';
 import { showAppAlert } from '../../src/utils/alert';
 
+// ─── Design Tokens ────────────────────────────────────────────────────────────
+const C = {
+  bg:           '#0A0E1A',
+  surface:      '#12172B',
+  surface2:     '#1A2035',
+  surface3:     '#232B45',
+  border:       'rgba(255,255,255,0.08)',
+  primary:      '#FF6B35',
+  primaryLight: '#FF8C5A',
+  green:        '#10B981',
+  textPrimary:  '#F9FAFB',
+  textSecondary:'#9CA3AF',
+  textMuted:    '#4B5563',
+};
+
 export default function JoinRideScreen() {
-  const [code, setCode] = useState('');
-  const [preview, setPreview] = useState<RidePreview | null>(null);
+  const [code, setCode]         = useState('');
+  const [preview, setPreview]   = useState<RidePreview | null>(null);
   const [lookingUp, setLookingUp] = useState(false);
-  const [joining, setJoining] = useState(false);
-  const { user, fetchProfile } = useAuthStore();
-  const { joinRide } = useRideStore();
+  const [joining, setJoining]   = useState(false);
+  const [codeActive, setCodeActive] = useState(false);
+  const { user, fetchProfile }  = useAuthStore();
+  const { joinRide }            = useRideStore();
 
   const handleLookup = async () => {
     if (code.length < 6) {
@@ -91,117 +107,231 @@ export default function JoinRideScreen() {
     router.replace(`/ride/lobby?rideId=${preview.ride_id}`);
   };
 
+  const codeReady = code.length === 6;
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+    <SafeAreaView style={s.container}>
+      {/* Header */}
+      <View style={s.header}>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Text style={s.backText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Join Ride</Text>
+        <Text style={s.headerTitle}>Join Ride</Text>
         <View style={{ width: 60 }} />
       </View>
 
-      <View style={styles.content}>
-        <Text style={styles.label}>Enter Ride Code</Text>
-        <Text style={styles.hint}>Ask your ride leader for the 6-character code</Text>
+      <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {/* Hero */}
+        <Text style={s.heroTitle}>Join a Ride</Text>
+        <Text style={s.heroSub}>Enter the 6-character code from your ride leader to hop in.</Text>
 
-        <TextInput
-          style={styles.codeInput}
-          placeholder="AB1234"
-          placeholderTextColor="#ccc"
-          value={code}
-          onChangeText={(t) => {
-            setCode(t.toUpperCase());
-            setPreview(null);
-          }}
-          maxLength={6}
-          autoCapitalize="characters"
-          autoCorrect={false}
-        />
+        {/* Big Code Input */}
+        <View style={s.codeWrap}>
+          <TextInput
+            style={[s.codeInput, codeActive && s.codeInputFocused]}
+            placeholder="AB1234"
+            placeholderTextColor={C.textMuted}
+            value={code}
+            onChangeText={(t) => {
+              setCode(t.toUpperCase());
+              setPreview(null);
+            }}
+            maxLength={6}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            onFocus={() => setCodeActive(true)}
+            onBlur={() => setCodeActive(false)}
+          />
+          {/* Character progress dots */}
+          <View style={s.codeDotsRow}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <View
+                key={i}
+                style={[s.codeDot, i < code.length && s.codeDotFilled]}
+              />
+            ))}
+          </View>
+        </View>
 
+        {/* Find Ride Button */}
         <TouchableOpacity
-          style={[styles.lookupBtn, lookingUp && styles.btnDisabled]}
+          style={[s.findBtn, (!codeReady || lookingUp) && s.btnDisabled]}
           onPress={handleLookup}
-          disabled={lookingUp || code.length < 6}
+          disabled={lookingUp || !codeReady}
+          activeOpacity={0.85}
         >
           {lookingUp
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.lookupBtnText}>Find Ride</Text>
+            : <Text style={s.findBtnText}>Find Ride 🔍</Text>
           }
         </TouchableOpacity>
 
-        {/* Ride Preview */}
-        {preview && (
-          <View style={styles.previewCard}>
-            <Text style={styles.previewTitle}>{preview.ride_name}</Text>
-            <View style={styles.previewRow}>
-              <Text style={styles.previewIcon}>📍</Text>
-              <Text style={styles.previewText}>{preview.meeting_name}</Text>
+        {/* Divider */}
+        <View style={s.dividerRow}>
+          <View style={s.dividerLine} />
+          <Text style={s.dividerText}>Ride Preview</Text>
+          <View style={s.dividerLine} />
+        </View>
+
+        {/* Ride Preview Card */}
+        {preview ? (
+          <View style={s.previewCard}>
+            {/* Status pill */}
+            <View style={s.statusPill}>
+              <View style={s.statusDot} />
+              <Text style={s.statusText}>{preview.status?.toUpperCase() ?? 'ACTIVE'}</Text>
             </View>
-            <View style={styles.previewRow}>
-              <Text style={styles.previewIcon}>🏁</Text>
-              <Text style={styles.previewText}>{preview.destination_name}</Text>
+
+            <Text style={s.previewTitle}>{preview.ride_name}</Text>
+
+            <View style={s.previewRow}>
+              <View style={s.previewIconWrap}>
+                <Text style={s.previewEmoji}>📍</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.previewRowLabel}>MEETING POINT</Text>
+                <Text style={s.previewRowValue}>{preview.meeting_name}</Text>
+              </View>
             </View>
-            <View style={styles.previewRow}>
-              <Text style={styles.previewIcon}>👥</Text>
-              <Text style={styles.previewText}>{preview.member_count} rider{preview.member_count !== 1 ? 's' : ''}</Text>
+
+            <View style={s.previewDivider} />
+
+            <View style={s.previewRow}>
+              <View style={s.previewIconWrap}>
+                <Text style={s.previewEmoji}>🏁</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.previewRowLabel}>DESTINATION</Text>
+                <Text style={s.previewRowValue}>{preview.destination_name}</Text>
+              </View>
+            </View>
+
+            <View style={s.previewDivider} />
+
+            <View style={s.previewRow}>
+              <View style={s.previewIconWrap}>
+                <Text style={s.previewEmoji}>👥</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.previewRowLabel}>RIDERS</Text>
+                <Text style={s.previewRowValue}>
+                  {preview.member_count} rider{preview.member_count !== 1 ? 's' : ''} joined
+                </Text>
+              </View>
             </View>
 
             <TouchableOpacity
-              style={[styles.joinBtn, joining && styles.btnDisabled]}
+              style={[s.joinBtn, joining && s.btnDisabled]}
               onPress={handleJoin}
               disabled={joining}
+              activeOpacity={0.85}
             >
               {joining
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.joinBtnText}>Join This Ride →</Text>
+                : <Text style={s.joinBtnText}>🏍  Join This Ride →</Text>
               }
             </TouchableOpacity>
           </View>
+        ) : (
+          <View style={s.emptyPreview}>
+            <Text style={s.emptyPreviewEmoji}>🏍</Text>
+            <Text style={s.emptyPreviewText}>Enter the ride code above{'\n'}to see ride details</Text>
+          </View>
         )}
-      </View>
+
+        <View style={{ height: 32 }} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
+
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#fff', padding: 16, paddingTop: 12,
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+    paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14,
+    borderBottomWidth: 1, borderBottomColor: C.border,
   },
-  backBtn: { padding: 4 },
-  backText: { fontSize: 16, color: '#FF6B35', fontWeight: '600' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
-  content: { padding: 24, flex: 1 },
-  label: { fontSize: 20, fontWeight: '700', color: '#1a1a1a', marginBottom: 6 },
-  hint: { fontSize: 14, color: '#888', marginBottom: 24 },
+  backBtn:     { minWidth: 60, minHeight: 44, justifyContent: 'center' },
+  backText:    { fontSize: 16, color: C.primary, fontWeight: '600' },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: C.textPrimary },
+
+  content: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 40 },
+
+  heroTitle: { fontSize: 30, fontWeight: '800', color: C.textPrimary, letterSpacing: -0.5, marginBottom: 8 },
+  heroSub:   { fontSize: 14, color: C.textSecondary, lineHeight: 22, marginBottom: 32 },
+
+  // Code Input
+  codeWrap: { alignItems: 'center', marginBottom: 20 },
   codeInput: {
-    borderWidth: 2, borderColor: '#FF6B35', borderRadius: 16,
-    padding: 18, fontSize: 32, fontWeight: '800', color: '#1a1a1a',
-    textAlign: 'center', letterSpacing: 6, backgroundColor: '#fff',
-    marginBottom: 16,
+    width: '100%',
+    backgroundColor: C.surface3,
+    borderWidth: 2, borderColor: C.border,
+    borderRadius: 20, height: 90,
+    textAlign: 'center',
+    fontSize: 40, fontWeight: '800',
+    color: C.primary,
+    letterSpacing: 10,
+    fontVariant: ['tabular-nums'],
   },
-  lookupBtn: {
-    backgroundColor: '#1a1a1a', borderRadius: 14,
-    padding: 16, alignItems: 'center',
+  codeInputFocused: { borderColor: C.primary, borderWidth: 2.5 },
+  codeDotsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  codeDot:     { width: 8, height: 8, borderRadius: 4, backgroundColor: C.surface3, borderWidth: 1, borderColor: C.border },
+  codeDotFilled: { backgroundColor: C.primary, borderColor: C.primary },
+
+  findBtn: {
+    backgroundColor: C.primary, borderRadius: 14,
+    height: 54, alignItems: 'center', justifyContent: 'center',
+    marginBottom: 28,
+    shadowColor: C.primary, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
   },
-  btnDisabled: { opacity: 0.5 },
-  lookupBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  btnDisabled:  { opacity: 0.45 },
+  findBtnText:  { color: '#fff', fontSize: 17, fontWeight: '800' },
+
+  dividerRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: C.border },
+  dividerText: { fontSize: 12, fontWeight: '600', color: C.textMuted, letterSpacing: 0.5 },
+
+  // Preview Card
   previewCard: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 20,
-    marginTop: 24, shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08,
-    shadowRadius: 8, elevation: 3,
+    backgroundColor: C.surface2, borderRadius: 20,
+    borderWidth: 1, borderColor: C.border,
+    padding: 20,
+    shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 20, elevation: 12,
   },
-  previewTitle: { fontSize: 20, fontWeight: '800', color: '#1a1a1a', marginBottom: 16 },
-  previewRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  previewIcon: { fontSize: 18, width: 28 },
-  previewText: { fontSize: 15, color: '#444' },
+  statusPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(16,185,129,0.12)', borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 4, marginBottom: 12,
+  },
+  statusDot:  { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
+  statusText: { fontSize: 11, fontWeight: '700', color: C.green, letterSpacing: 0.8 },
+
+  previewTitle: { fontSize: 22, fontWeight: '800', color: C.textPrimary, marginBottom: 18, letterSpacing: -0.3 },
+
+  previewRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  previewIconWrap:{ width: 36, height: 36, borderRadius: 10, backgroundColor: C.surface3, alignItems: 'center', justifyContent: 'center' },
+  previewEmoji:   { fontSize: 18 },
+  previewRowLabel:{ fontSize: 10, fontWeight: '700', color: C.textMuted, letterSpacing: 0.8, textTransform: 'uppercase' },
+  previewRowValue:{ fontSize: 14, fontWeight: '600', color: C.textPrimary, marginTop: 2 },
+  previewDivider: { height: 1, backgroundColor: C.border },
+
   joinBtn: {
-    backgroundColor: '#FF6B35', borderRadius: 12,
-    padding: 16, alignItems: 'center', marginTop: 20,
+    backgroundColor: C.primary, borderRadius: 14,
+    height: 54, alignItems: 'center', justifyContent: 'center',
+    marginTop: 20,
+    shadowColor: C.primary, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
   },
-  joinBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  joinBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
+
+  // Empty State
+  emptyPreview: {
+    backgroundColor: C.surface2, borderRadius: 20,
+    borderWidth: 1, borderColor: C.border,
+    padding: 40, alignItems: 'center',
+  },
+  emptyPreviewEmoji: { fontSize: 40, marginBottom: 12 },
+  emptyPreviewText:  { fontSize: 15, color: C.textMuted, textAlign: 'center', lineHeight: 24 },
 });
