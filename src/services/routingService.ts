@@ -10,6 +10,17 @@ export interface RideStop {
   lng: number;
 }
 
+export interface RouteStep {
+  instruction: string;       // Human-readable turn instruction
+  distance: number;          // Distance in metres to this step's end
+  duration: number;          // Duration in seconds
+  maneuverType: string;      // OSRM: 'turn', 'depart', 'arrive', 'roundabout', etc.
+  maneuverModifier: string;  // OSRM: 'left', 'right', 'straight', 'slight left', etc.
+  name: string;              // Road/street name
+  lat: number;               // Maneuver point coordinate
+  lng: number;
+}
+
 export interface RouteOption {
   id: string;
   name: string;
@@ -17,6 +28,7 @@ export interface RouteOption {
   durationMinutes: number;
   durationText: string;
   coordinates: { lat: number; lng: number }[];
+  steps: RouteStep[];
 }
 
 export async function fetchRoutes(
@@ -33,7 +45,7 @@ export async function fetchRoutes(
     points.push(`${destLng},${destLat}`);
 
     const coordsStr = points.join(';');
-    const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&alternatives=${stops.length === 0}`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson&steps=true&alternatives=${stops.length === 0}`;
 
     const res = await fetch(url, {
       headers: {
@@ -61,6 +73,30 @@ export async function fetchRoutes(
         lng,
       }));
 
+      // Parse steps from all legs into RouteStep[]
+      const steps: RouteStep[] = [];
+      if (route.legs) {
+        for (const leg of route.legs) {
+          if (leg.steps) {
+            for (const step of leg.steps) {
+              const manType: string = step.maneuver?.type ?? 'turn';
+              const manMod: string = step.maneuver?.modifier ?? 'straight';
+              const [sLng, sLat] = step.maneuver?.location ?? [0, 0];
+              steps.push({
+                instruction: buildInstruction(manType, manMod, step.name || ''),
+                distance: step.distance ?? 0,
+                duration: step.duration ?? 0,
+                maneuverType: manType,
+                maneuverModifier: manMod,
+                name: step.name || '',
+                lat: sLat,
+                lng: sLng,
+              });
+            }
+          }
+        }
+      }
+
       const summaryName = stops.length > 0
         ? `Via ${stops.length} stop${stops.length > 1 ? 's' : ''}`
         : route.legs?.[0]?.summary
@@ -76,6 +112,7 @@ export async function fetchRoutes(
         durationMinutes,
         durationText,
         coordinates,
+        steps,
       };
     });
   } catch (err) {
@@ -83,6 +120,34 @@ export async function fetchRoutes(
     return getFallbackRoute(startLat, startLng, destLat, destLng);
   }
 }
+
+/** Convert OSRM maneuver type + modifier into a human-readable instruction */
+export function buildInstruction(type: string, modifier: string, roadName: string): string {
+  const road = roadName ? ` onto ${roadName}` : '';
+  const modMap: Record<string, string> = {
+    left: 'Turn left',
+    right: 'Turn right',
+    'slight left': 'Bear left',
+    'slight right': 'Bear right',
+    'sharp left': 'Turn sharp left',
+    'sharp right': 'Turn sharp right',
+    straight: 'Continue straight',
+    uturn: 'Make a U-turn',
+  };
+
+  if (type === 'depart') return `Head ${modifier || 'forward'}${road}`;
+  if (type === 'arrive') return 'You have arrived at your destination';
+  if (type === 'roundabout' || type === 'rotary') return `At the roundabout, take the exit${road}`;
+  if (type === 'fork') return `Keep ${modifier || 'straight'}${road}`;
+  if (type === 'merge') return `Merge ${modifier || 'onto road'}${road}`;
+  if (type === 'ramp' || type === 'on ramp') return `Take the on-ramp${road}`;
+  if (type === 'off ramp') return `Take the off-ramp${road}`;
+  if (type === 'end of road') return `Turn ${modifier || 'right'}${road}`;
+  if (type === 'continue' || type === 'new name') return `Continue straight${road}`;
+
+  return (modMap[modifier] ?? 'Turn') + road;
+}
+
 
 // Search for POIs (Fuel, Cafe, Rest Stops) between start and destination
 export async function fetchSuggestedStops(
@@ -210,6 +275,7 @@ function getFallbackRoute(
         { lat: startLat, lng: startLng },
         { lat: destLat, lng: destLng },
       ],
+      steps: [],
     },
   ];
 }

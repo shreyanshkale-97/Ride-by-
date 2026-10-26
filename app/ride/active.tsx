@@ -16,7 +16,7 @@ import {
 } from '../../src/services/locationService';
 import { supabase } from '../../src/services/supabase';
 import { Ride, RideMember, ChatMessage } from '../../src/types';
-import { fetchRoutes, RideStop } from '../../src/services/routingService';
+import { fetchRoutes, RideStop, RouteStep } from '../../src/services/routingService';
 import {
   calcDistanceM, formatDistance, getRelativePosition,
 } from '../../src/utils/location';
@@ -30,6 +30,7 @@ export default function ActiveRideScreen() {
   const { riderMarkers, activeRide, members, messages, addMessage, setMessages } = useRideStore();
 
   const mapRef = useRef<any>(null);
+  const iframeRef = useRef<any>(null);
   const chatChannelRef = useRef<any>(null);
 
   const [myLat, setMyLat] = useState(22.7196);
@@ -47,6 +48,12 @@ export default function ActiveRideScreen() {
   const [sosActive, setSosActive] = useState(false);
   const [hudExpanded, setHudExpanded] = useState(true);
 
+  // Turn-by-turn navigation state
+  const [routeSteps, setRouteSteps] = useState<RouteStep[]>([]);
+  const [currentStepIdx, setCurrentStepIdx] = useState(0);
+  const [distToNextStep, setDistToNextStep] = useState(0);
+  const [navCentered, setNavCentered] = useState(true); // auto-follow my location
+
   useEffect(() => {
     if (!rideId) return;
     initRide();
@@ -59,6 +66,62 @@ export default function ActiveRideScreen() {
       }
     };
   }, [rideId]);
+
+  // Track which nav step we're on as position changes
+  useEffect(() => {
+    if (routeSteps.length === 0) return;
+
+    // Find the closest upcoming step that's ahead of us
+    let bestIdx = currentStepIdx;
+    let bestDist = Infinity;
+
+    for (let i = currentStepIdx; i < routeSteps.length; i++) {
+      const step = routeSteps[i];
+      if (!step.lat || !step.lng) continue;
+      const d = calcDistanceM(myLat, myLng, step.lat, step.lng);
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = i;
+      }
+      // Once steps are more than 2km ahead, stop searching
+      if (d > 2000 && i > currentStepIdx) break;
+    }
+
+    // Advance step if we're within 30m of the next maneuver point
+    const nextStep = routeSteps[currentStepIdx];
+    if (nextStep?.lat && nextStep?.lng) {
+      const distToNext = calcDistanceM(myLat, myLng, nextStep.lat, nextStep.lng);
+      setDistToNextStep(distToNext);
+
+      if (distToNext < 30 && currentStepIdx < routeSteps.length - 1) {
+        setCurrentStepIdx((prev) => prev + 1);
+      }
+    }
+
+    // Send navigation step + recenter postMessage to Leaflet iframe
+    if (iframeRef.current?.contentWindow) {
+      try {
+        // Recenter map on user if navCentered mode is on
+        if (navCentered) {
+          iframeRef.current.contentWindow.postMessage(
+            { type: 'RECENTER', lat: myLat, lng: myLng },
+            '*'
+          );
+        }
+        // Send current nav step to show turn arrow
+        if (routeSteps[currentStepIdx]) {
+          iframeRef.current.contentWindow.postMessage(
+            {
+              type: 'NAV_STEP',
+              step: routeSteps[currentStepIdx],
+              distToNext: distToNextStep,
+            },
+            '*'
+          );
+        }
+      } catch (_) {}
+    }
+  }, [myLat, myLng, routeSteps, navCentered]);
 
   const initRide = async () => {
     // 1. Resolve user ID (store or Supabase session)
@@ -111,6 +174,8 @@ export default function ActiveRideScreen() {
           setRouteCoordinates(routes[0].coordinates);
           setTotalDistanceKm(routes[0].distanceKm);
           setDurationText(routes[0].durationText);
+          setRouteSteps(routes[0].steps ?? []);
+          setCurrentStepIdx(0);
         }
       } catch (e) {
         console.warn('Error fetching route:', e);
@@ -302,11 +367,34 @@ export default function ActiveRideScreen() {
     ? calcDistanceM(myLat, myLng, ride.destination_lat, ride.destination_lng)
     : 0;
 
+  // Get turn arrow emoji based on OSRM maneuver type + modifier
+  function getTurnArrow(type: string = '', modifier: string = ''): string {
+    if (type === 'arrive') return '🏁';
+    if (type === 'depart') return '🚀';
+    if (type === 'roundabout' || type === 'rotary') return '🔄';
+    if (modifier === 'left') return '⬅️';
+    if (modifier === 'right') return '➡️';
+    if (modifier === 'slight left') return '↖️';
+    if (modifier === 'slight right') return '↗️';
+    if (modifier === 'sharp left') return '↩️';
+    if (modifier === 'sharp right') return '↪️';
+    if (modifier === 'uturn') return '🔁';
+    return '⬆️';
+  }
+
+  // Format distance for the nav banner (100 m, 1.2 km, etc.)
+  function formatNavDist(metres: number): string {
+    if (metres <= 0) return '–';
+    if (metres < 1000) return `${Math.round(metres / 10) * 10} m`;
+    return `${(metres / 1000).toFixed(1)} km`;
+  }
+
   return (
     <View style={styles.container}>
       {/* 1. FULL INTERACTIVE MAP WITH ROUTE & ALL RIDERS */}
       <RideMap
         ref={mapRef}
+        iframeRef={iframeRef}
         myLat={myLat}
         myLng={myLng}
         startLat={ride?.meeting_lat ?? myLat}
@@ -356,6 +444,57 @@ export default function ActiveRideScreen() {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+
+      {/* 2b. TURN-BY-TURN NAV BANNER (Google Maps style) */}
+      {routeSteps.length > 0 && currentStepIdx < routeSteps.length && (
+        <View style={styles.navBanner}>
+          {/* Turn arrow icon */}
+          <View style={styles.navArrowBox}>
+            <Text style={styles.navArrowIcon}>
+              {getTurnArrow(routeSteps[currentStepIdx]?.maneuverType, routeSteps[currentStepIdx]?.maneuverModifier)}
+            </Text>
+          </View>
+
+          {/* Instruction text */}
+          <View style={styles.navTextBox}>
+            <Text style={styles.navDistText}>
+              {formatNavDist(distToNextStep)}
+            </Text>
+            <Text style={styles.navInstrText} numberOfLines={2}>
+              {routeSteps[currentStepIdx]?.instruction ?? 'Continue on route'}
+            </Text>
+            {routeSteps[currentStepIdx + 1] && (
+              <Text style={styles.navNextText} numberOfLines={1}>
+                Then: {routeSteps[currentStepIdx + 1]?.instruction}
+              </Text>
+            )}
+          </View>
+
+          {/* Step counter */}
+          <Text style={styles.navStepCounter}>
+            {currentStepIdx + 1}/{routeSteps.length}
+          </Text>
+        </View>
+      )}
+
+      {/* RECENTER BUTTON (floating, bottom-right above controls) */}
+      <TouchableOpacity
+        style={[styles.recenterBtn, navCentered && styles.recenterBtnActive]}
+        onPress={() => {
+          setNavCentered(true);
+          // Immediately recenter on tap
+          if (iframeRef.current?.contentWindow) {
+            try {
+              iframeRef.current.contentWindow.postMessage(
+                { type: 'RECENTER', lat: myLat, lng: myLng, zoom: 16 },
+                '*'
+              );
+            } catch (_) {}
+          }
+        }}
+      >
+        <Text style={styles.recenterBtnText}>{navCentered ? '📍' : '🎯'}</Text>
+      </TouchableOpacity>
 
       {/* 3. RIDERS & DISTANCES HUD OVERLAY */}
       {hudExpanded && (
@@ -671,4 +810,92 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18, justifyContent: 'center',
   },
   sendBtnText: { color: '#fff', fontWeight: '700' },
+
+  // Turn-by-turn Nav Banner (Google Maps style)
+  navBanner: {
+    position: 'absolute',
+    top: 70,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1f36',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    zIndex: 110,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 12,
+    gap: 12,
+  },
+  navArrowBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  navArrowIcon: {
+    fontSize: 26,
+  },
+  navTextBox: {
+    flex: 1,
+  },
+  navDistText: {
+    color: '#60a5fa',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 1,
+  },
+  navInstrText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  navNextText: {
+    color: '#9ca3af',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  navStepCounter: {
+    color: '#6b7280',
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+  },
+
+  // Floating Recenter Button
+  recenterBtn: {
+    position: 'absolute',
+    bottom: 90,
+    right: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 120,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 8,
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+  },
+  recenterBtnActive: {
+    borderColor: '#2563eb',
+    backgroundColor: '#eff6ff',
+  },
+  recenterBtnText: {
+    fontSize: 22,
+  },
 });

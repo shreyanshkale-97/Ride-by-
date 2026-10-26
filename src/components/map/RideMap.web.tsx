@@ -30,6 +30,7 @@ export interface RideMapProps {
   routeCoordinates?: { lat: number; lng: number }[];
   stops?: RideStop[];
   riders: DisplayRider[];
+  iframeRef?: React.MutableRefObject<any>; // optional external ref to the iframe
 }
 
 export const RideMap = forwardRef<any, RideMapProps>(({
@@ -44,8 +45,15 @@ export const RideMap = forwardRef<any, RideMapProps>(({
   routeCoordinates = [],
   stops = [],
   riders = [],
+  iframeRef: externalIframeRef,
 }, _ref) => {
-  const iframeRef = useRef<any>(null);
+  const internalRef = useRef<any>(null);
+
+  // Callback ref that assigns to both internal and external ref
+  const setIframeRef = (el: any) => {
+    internalRef.current = el;
+    if (externalIframeRef) externalIframeRef.current = el;
+  };
 
   const initialRouteJson = JSON.stringify(
     routeCoordinates.map((c) => [c.lat, c.lng])
@@ -82,9 +90,9 @@ export const RideMap = forwardRef<any, RideMapProps>(({
 
   // Send real-time coordinate updates to the Leaflet iframe via postMessage
   useEffect(() => {
-    if (iframeRef.current && iframeRef.current.contentWindow) {
+    if (internalRef.current && internalRef.current.contentWindow) {
       try {
-        iframeRef.current.contentWindow.postMessage(
+        internalRef.current.contentWindow.postMessage(
           {
             type: 'UPDATE_LOCATIONS',
             myLat,
@@ -339,22 +347,78 @@ export const RideMap = forwardRef<any, RideMapProps>(({
         // Fit map initially
         map.fitBounds(bounds, { padding: [45, 45] });
 
-        // Handler for real-time postMessage location updates
+        // Handler for real-time postMessage updates
+        var navStepMarker = null;
+
         window.addEventListener('message', function(event) {
-          if (!event.data || event.data.type !== 'UPDATE_LOCATIONS') return;
-          var updateList = event.data.riders || [];
-          updateList.forEach(function(r) {
-            if (riderMarkersMap[r.userId]) {
-              riderMarkersMap[r.userId].setLatLng([r.lat, r.lng]);
-              riderMarkersMap[r.userId].setPopupContent(getRiderPopupContent(r));
+          if (!event.data) return;
+
+          // --- Location updates ---
+          if (event.data.type === 'UPDATE_LOCATIONS') {
+            var updateList = event.data.riders || [];
+            updateList.forEach(function(r) {
+              if (riderMarkersMap[r.userId]) {
+                riderMarkersMap[r.userId].setLatLng([r.lat, r.lng]);
+                riderMarkersMap[r.userId].setPopupContent(getRiderPopupContent(r));
+              } else {
+                riderMarkersMap[r.userId] = createRiderMarker(r);
+              }
+            });
+          }
+
+          // --- Recenter on user ---
+          if (event.data.type === 'RECENTER') {
+            var z = event.data.zoom || 16;
+            map.flyTo([event.data.lat, event.data.lng], z, { animate: true, duration: 0.8 });
+          }
+
+          // --- Nav step: show next turn arrow marker on map ---
+          if (event.data.type === 'NAV_STEP') {
+            var step = event.data.step;
+            if (!step || !step.lat || !step.lng) return;
+
+            var arrowHtml = '<div style="' +
+              'background:#1a1f36;color:white;width:36px;height:36px;border-radius:10px;' +
+              'display:flex;align-items:center;justify-content:center;font-size:18px;' +
+              'border:2px solid #2563eb;box-shadow:0 3px 10px rgba(0,0,0,0.5);">' +
+              getArrowEmoji(step.maneuverType, step.maneuverModifier) +
+              '</div>';
+
+            var arrowIcon = L.divIcon({
+              className: 'custom-div-icon',
+              html: arrowHtml,
+              iconSize: [36, 36],
+              iconAnchor: [18, 18]
+            });
+
+            if (navStepMarker) {
+              navStepMarker.setLatLng([step.lat, step.lng]);
+              navStepMarker.setIcon(arrowIcon);
+              navStepMarker.setPopupContent('<b>' + step.instruction + '</b>');
             } else {
-              riderMarkersMap[r.userId] = createRiderMarker(r);
+              navStepMarker = L.marker([step.lat, step.lng], { icon: arrowIcon })
+                .addTo(map)
+                .bindPopup('<b>' + step.instruction + '</b>');
             }
-          });
+          }
         });
 
+        function getArrowEmoji(type, modifier) {
+          if (type === 'arrive') return '🏁';
+          if (type === 'depart') return '🚀';
+          if (type === 'roundabout' || type === 'rotary') return '🔄';
+          if (modifier === 'left') return '⬅';
+          if (modifier === 'right') return '➡';
+          if (modifier === 'slight left') return '↖';
+          if (modifier === 'slight right') return '↗';
+          if (modifier === 'sharp left') return '↩';
+          if (modifier === 'sharp right') return '↪';
+          if (modifier === 'uturn') return '🔁';
+          return '⬆';
+        }
+
         window.centerOnMe = function() {
-          map.setView([${myLat}, ${myLng}], 15);
+          map.flyTo([${myLat}, ${myLng}], 16, { animate: true, duration: 0.8 });
         };
 
         window.fitFullRoute = function() {
@@ -368,7 +432,7 @@ export const RideMap = forwardRef<any, RideMapProps>(({
   return (
     <View style={styles.container}>
       <iframe
-        ref={iframeRef}
+        ref={setIframeRef}
         srcDoc={html}
         style={{ width: '100%', height: '100%', border: 'none' }}
         title="RideBy Live Route Map"
