@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Platform, Dimensions, TextInput,
@@ -75,6 +75,27 @@ export default function ActiveRideScreen() {
         chatChannelRef.current = null;
       }
     };
+  }, [rideId]);
+
+  // ── Issue #7 Fix: Auto-refresh Supabase session every 50 min ──
+  // Supabase JWT expires after 1 hour. Without refresh, the realtime
+  // channel silently disconnects mid-ride. We refresh proactively.
+  useEffect(() => {
+    if (!rideId) return;
+    const SESSION_REFRESH_MS = 50 * 60 * 1000; // 50 minutes
+    const refreshTimer = setInterval(async () => {
+      try {
+        const { error } = await supabase.auth.refreshSession();
+        if (error) {
+          console.warn('[Auth] Session refresh failed:', error.message);
+        } else {
+          console.log('[Auth] Session refreshed successfully');
+        }
+      } catch (e) {
+        console.warn('[Auth] Session refresh error:', e);
+      }
+    }, SESSION_REFRESH_MS);
+    return () => clearInterval(refreshTimer);
   }, [rideId]);
 
 
@@ -369,55 +390,81 @@ export default function ActiveRideScreen() {
     ]);
   };
 
-  // Compute full list of all riders with coordinates & mutual distances
-  const displayRiders: DisplayRider[] = rideMembers.map((member) => {
-    const isSelf = member.user_id === user?.id;
-    const liveMarker = riderMarkers[member.user_id];
-    const name = member.profile?.name ?? (isSelf ? (user?.name || 'You') : 'Rider');
-    const role = member.role;
+  // ── Issue #5 & #4 Fix: Memoized displayRiders with stale detection ──
+  // useMemo prevents expensive distance calculations on every render.
+  // Stale detection: if no GPS update for 60s, rider is marked offline.
+  const STALE_THRESHOLD_MS = 60_000;
 
-    // Live position or fallback to meeting point
-    const lat = isSelf ? myLat : (liveMarker?.lat ?? ride?.meeting_lat ?? myLat);
-    const lng = isSelf ? myLng : (liveMarker?.lng ?? ride?.meeting_lng ?? myLng);
-    const speed = isSelf ? 0 : (liveMarker?.speed ?? 0);
-    const heading = isSelf ? 0 : (liveMarker?.heading ?? 0);
-    const isLive = Boolean(isSelf || liveMarker);
-    const status = isSelf
-      ? 'riding'
-      : (liveMarker ? (liveMarker.speed < 5 ? 'stopped' : 'riding') : member.status);
+  const displayRiders = useMemo<DisplayRider[]>(() => {
+    const now = Date.now();
 
-    const distFromMe = isSelf ? 0 : calcDistanceM(myLat, myLng, lat, lng);
+    const riders = rideMembers.map((member) => {
+      const isSelf = member.user_id === user?.id;
+      const liveMarker = riderMarkers[member.user_id];
+      const name = member.profile?.name ?? (isSelf ? (user?.name || 'You') : 'Rider');
+      const role = member.role;
 
-    return {
-      userId: member.user_id,
-      name,
-      role,
-      status,
-      lat,
-      lng,
-      speed,
-      heading,
-      isLive,
-      isSelf,
-      distanceFromMe: distFromMe,
-      distanceFromLeader: 0,
-      relativeToLeader: 'together',
-    };
-  });
+      // Check if this rider's GPS is stale (no update in 60s)
+      const lastUpdated = isSelf ? now : (liveMarker?.lastUpdated ?? 0);
+      const isStale = !isSelf && liveMarker ? (now - lastUpdated > STALE_THRESHOLD_MS) : false;
 
-  // Calculate gaps relative to the group leader
-  const leaderRider = displayRiders.find((r) => r.role === 'leader') || displayRiders[0];
-  if (leaderRider) {
-    displayRiders.forEach((r) => {
-      r.distanceFromLeader = calcDistanceM(leaderRider.lat, leaderRider.lng, r.lat, r.lng);
-      r.relativeToLeader = getRelativePosition(leaderRider.lat, leaderRider.lng, leaderRider.heading, r.lat, r.lng);
+      // Position: use live GPS or fallback to meeting point
+      const lat = isSelf ? myLat : (liveMarker?.lat ?? ride?.meeting_lat ?? myLat);
+      const lng = isSelf ? myLng : (liveMarker?.lng ?? ride?.meeting_lng ?? myLng);
+      const speed = isSelf ? 0 : (liveMarker?.speed ?? 0);
+      const heading = isSelf ? 0 : (liveMarker?.heading ?? 0);
+      const isLive = Boolean(isSelf || liveMarker);
+
+      // Status: stale = offline visually
+      const status = isSelf
+        ? 'riding'
+        : isStale
+          ? 'offline'
+          : liveMarker
+            ? (liveMarker.speed < 5 ? 'stopped' : 'riding')
+            : member.status;
+
+      const distFromMe = isSelf ? 0 : calcDistanceM(myLat, myLng, lat, lng);
+
+      return {
+        userId: member.user_id,
+        name,
+        role,
+        status,
+        lat,
+        lng,
+        speed,
+        heading,
+        isLive,
+        isSelf,
+        lastUpdated,       // passed to RideMap for stale marker styling
+        distanceFromMe: distFromMe,
+        distanceFromLeader: 0,
+        relativeToLeader: 'together' as const,
+      };
     });
-  }
 
-  // Calculate distance to destination from current position
-  const remainingDistToDest = ride
-    ? calcDistanceM(myLat, myLng, ride.destination_lat, ride.destination_lng)
-    : 0;
+    // Calculate distances relative to the group leader
+    const leader = riders.find((r) => r.role === 'leader') || riders[0];
+    if (leader) {
+      riders.forEach((r) => {
+        r.distanceFromLeader = calcDistanceM(leader.lat, leader.lng, r.lat, r.lng);
+        r.relativeToLeader = getRelativePosition(
+          leader.lat, leader.lng, leader.heading, r.lat, r.lng
+        );
+      });
+    }
+
+    return riders;
+  }, [myLat, myLng, riderMarkers, rideMembers, user?.id, user?.name, ride]);
+
+  // Distance remaining to destination (memoized)
+  const remainingDistToDest = useMemo(
+    () => ride ? calcDistanceM(myLat, myLng, ride.destination_lat, ride.destination_lng) : 0,
+    [myLat, myLng, ride]
+  );
+
+
 
   // Get turn arrow emoji based on OSRM maneuver type + modifier
   function getTurnArrow(type: string = '', modifier: string = ''): string {
