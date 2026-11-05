@@ -4,6 +4,7 @@ import {
   Platform, Dimensions, TextInput,
   FlatList, KeyboardAvoidingView, SafeAreaView, ScrollView,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
 import { RideMap, DisplayRider } from '../../src/components/map/RideMap';
@@ -22,6 +23,7 @@ import {
 } from '../../src/utils/location';
 import { showAppAlert } from '../../src/utils/alert';
 
+
 const { height } = Dimensions.get('window');
 
 export default function ActiveRideScreen() {
@@ -32,6 +34,9 @@ export default function ActiveRideScreen() {
   const mapRef = useRef<any>(null);
   const iframeRef = useRef<any>(null);
   const chatChannelRef = useRef<any>(null);
+  // Continuous GPS watch — keeps myLat/myLng live during the ride
+  const gpsWatchRef = useRef<Location.LocationSubscription | null>(null);
+
 
   const [myLat, setMyLat] = useState(22.7196);
   const [myLng, setMyLng] = useState(75.8577);
@@ -58,6 +63,11 @@ export default function ActiveRideScreen() {
     if (!rideId) return;
     initRide();
     return () => {
+      // Stop GPS watch
+      if (gpsWatchRef.current) {
+        gpsWatchRef.current.remove();
+        gpsWatchRef.current = null;
+      }
       stopLocationBroadcast();
       unsubscribeFromRide();
       if (chatChannelRef.current) {
@@ -66,6 +76,7 @@ export default function ActiveRideScreen() {
       }
     };
   }, [rideId]);
+
 
   // Track which nav step we're on as position changes
   useEffect(() => {
@@ -203,34 +214,74 @@ export default function ActiveRideScreen() {
       console.warn('GPS permission prompt notice:', e);
     }
 
-    // 4. Get current position
+    // 4. Get initial position quickly
     const loc = await getCurrentLocation();
     if (loc) {
       setMyLat(loc.coords.latitude);
       setMyLng(loc.coords.longitude);
-      try {
-        mapRef.current?.animateToRegion?.({
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.02,
-        });
-      } catch (_) {}
     }
 
-    // 5. Start broadcasting location
     if (currentUserId) {
-      await startLocationBroadcast(rideId, currentUserId, membersRes.data?.length ?? 1);
-
-      // 6. Subscribe to realtime channel
+      // 5. Subscribe to realtime FIRST (so channel is ready before broadcasts start)
       subscribeToRide(rideId, currentUserId, currentUserName, currentUserAvatar, (status) => {
         if (status === 'completed' || status === 'cancelled') {
           router.replace(`/ride/summary?rideId=${rideId}`);
         }
       });
+
+      // 6. Start broadcasting location after short delay (channel needs to subscribe first)
+      setTimeout(() => {
+        startLocationBroadcast(rideId, currentUserId!, membersRes.data?.length ?? 1);
+      }, 1500);
     }
 
-    // 7. Listen for new chat messages safely
+    // 7. CONTINUOUS GPS WATCH — THE CRITICAL FIX
+    // Without this, myLat/myLng is frozen at the initial value and your blue dot never moves.
+    try {
+      if (Platform.OS !== 'web') {
+        // Native: expo-location watchPositionAsync updates React state continuously
+        const sub = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.BestForNavigation,
+            timeInterval: 5000,    // at least every 5s
+            distanceInterval: 10,  // or every 10m of movement
+          },
+          (position) => {
+            setMyLat(position.coords.latitude);
+            setMyLng(position.coords.longitude);
+          }
+        );
+        gpsWatchRef.current = sub;
+      } else {
+        // Web: browser Geolocation API
+        if (typeof navigator !== 'undefined' && navigator.geolocation) {
+          const watchId = navigator.geolocation.watchPosition(
+            (position) => {
+              setMyLat(position.coords.latitude);
+              setMyLng(position.coords.longitude);
+            },
+            (err) => console.warn('[GPS Web] watchPosition error:', err.message),
+            { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+          );
+          gpsWatchRef.current = {
+            remove: () => navigator.geolocation.clearWatch(watchId),
+          } as unknown as Location.LocationSubscription;
+        }
+      }
+    } catch (gpsErr) {
+      console.warn('[GPS] Watch setup failed, falling back to polling:', gpsErr);
+      // Fallback: poll getCurrentLocation every 10s
+      const pollInterval = setInterval(async () => {
+        try {
+          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          setMyLat(pos.coords.latitude);
+          setMyLng(pos.coords.longitude);
+        } catch (_) {}
+      }, 10000);
+      gpsWatchRef.current = { remove: () => clearInterval(pollInterval) } as unknown as Location.LocationSubscription;
+    }
+
+    // 8. Listen for new chat messages safely
     const chatTopic = `realtime:chat:${rideId}`;
     const existingChat = supabase.getChannels().find((c) => c.topic === chatTopic);
     if (existingChat) {
@@ -253,6 +304,7 @@ export default function ActiveRideScreen() {
 
     chatChannelRef.current = chatChannel;
   };
+
 
   const handleSendChat = async () => {
     const text = chatInput.trim();
