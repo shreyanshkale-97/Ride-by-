@@ -47,10 +47,11 @@ export default function LobbyScreen() {
   const [starting, setStarting] = useState(false);
   const [loadingMap, setLoadingMap] = useState(true);
 
-  // Robust leader calculation
+  // Leader status computed ONLY from server-verified DB data — NOT from URL params
+  // (URL params can be spoofed by any user appending ?isLeader=true to the URL)
   const isMemberLeader = members.some((m) => m.user_id === user?.id && m.role === 'leader');
   const isCreator = Boolean(ride && user && ride.creator_id === user.id);
-  const amLeader = isLeader === 'true' || isCreator || isMemberLeader;
+  const amLeader = isCreator || isMemberLeader;
 
   useEffect(() => {
     if (!rideId) return;

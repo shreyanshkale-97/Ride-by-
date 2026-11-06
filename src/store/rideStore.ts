@@ -186,20 +186,24 @@ export const useRideStore = create<RideState>((set, get) => ({
   },
 
   endRide: async (rideId) => {
-    const { error } = await supabase.functions.invoke('ride-transition', {
-      body: { ride_id: rideId, target_status: 'completed' },
-    });
+    // Direct DB update — avoids calling non-existent 'ride-transition' edge function
+    const { error } = await supabase
+      .from('rides')
+      .update({ status: 'completed', ended_at: new Date().toISOString() })
+      .eq('id', rideId);
     if (error) return error.message;
     return null;
   },
 
   sendMessage: async (rideId, userId, message) => {
-    await supabase.from('ride_messages').insert({ ride_id: rideId, user_id: userId, message });
+    const { error } = await supabase.from('ride_messages').insert({ ride_id: rideId, user_id: userId, message });
+    if (error) console.warn('[Chat] Message send failed:', error.message);
   },
 
   triggerSOS: async (rideId, userId, lat, lng) => {
-    await supabase.from('emergency_events').insert({
+    const { error } = await supabase.from('emergency_events').insert({
       ride_id: rideId, user_id: userId, latitude: lat, longitude: lng,
     });
+    if (error) console.warn('[SOS] DB insert failed:', error.message);
   },
 }));

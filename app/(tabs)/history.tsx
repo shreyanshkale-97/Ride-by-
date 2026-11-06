@@ -28,17 +28,25 @@ export default function HistoryScreen() {
 
   useEffect(() => {
     fetchHistory();
-  }, []);
+  }, [user]); // user must be in dep array — otherwise infinite spinner when user loads after mount
 
   const fetchHistory = async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('ride_history')
-      .select('*, ride:rides(name, meeting_name, destination_name)')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-    setHistory(data ?? []);
-    setLoading(false);
+    if (!user) {
+      setLoading(false); // CRITICAL: always stop loading even if user is null
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('ride_history')
+        .select('*, ride:rides(name, meeting_name, destination_name)')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (error) console.warn('[History] fetch failed:', error.message);
+      setHistory(data ?? []);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const formatDuration = (mins?: number) => {

@@ -106,9 +106,10 @@ export default function RideSettingsScreen() {
       customCode: rideCode,
       description: description.trim(),
       maxMembers,
-      startTime: `${startDate} ${startTime}`,
-      endTime: `${endDate} ${endTime}`,
-      joinDeadline: `${joinDeadlineDate} ${joinDeadlineTime}`,
+      // Convert to ISO 8601 — PostgreSQL rejects "2026-11-07 06:00 AM" format
+      startTime: startDate && startTime ? new Date(`${startDate} ${startTime}`).toISOString() : undefined,
+      endTime: endDate && endTime ? new Date(`${endDate} ${endTime}`).toISOString() : undefined,
+      joinDeadline: joinDeadlineDate && joinDeadlineTime ? new Date(`${joinDeadlineDate} ${joinDeadlineTime}`).toISOString() : undefined,
       estimatedCost: estimatedCost.trim(),
       stops,
       totalDistance: parseFloat(params.distanceKm) || 0,

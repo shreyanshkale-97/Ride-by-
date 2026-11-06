@@ -36,7 +36,7 @@ export default function SummaryScreen() {
   useEffect(() => {
     if (!rideId || !user) return;
     fetchAndSave();
-  }, [rideId]);
+  }, [rideId, user]); // user MUST be in dep array — otherwise infinite spinner if user loads after mount
 
   const fetchAndSave = async () => {
     const [rideRes, membersRes] = await Promise.all([
@@ -59,6 +59,8 @@ export default function SummaryScreen() {
         user_id: user.id,
         duration_min: durationMin,
         member_count: count,
+        // CRITICAL FIX: save total_distance — without this, history always shows "—" for distance
+        total_distance: rideRes.data?.total_distance ?? null,
       });
       if (histErr) console.warn('[Summary] History save failed:', histErr.message);
     }

@@ -25,26 +25,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setUser: (user) => set({ user }),
 
   signIn: async (email, password) => {
+    set({ loading: true });
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return error.message;
+    if (error) { set({ loading: false }); return error.message; }
     if (data.user) await get().fetchProfile(data.user.id);
+    set({ loading: false });
     return null;
   },
 
   signUp: async (email, password, name) => {
+    set({ loading: true });
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { name } },
     });
-    if (error) return error.message;
+    if (error) { set({ loading: false }); return error.message; }
     if (data.user) await get().fetchProfile(data.user.id);
+    set({ loading: false });
     return null;
   },
 
   signOut: async () => {
     await supabase.auth.signOut();
-    set({ user: null, session: null });
+    // Clear ride store state so stale data doesn't bleed to next user session
+    const { useRideStore } = await import('./rideStore');
+    useRideStore.getState().clearRide();
+    set({ user: null, session: null, loading: false });
   },
 
   fetchProfile: async (userId) => {
@@ -53,6 +60,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       .select('*')
       .eq('id', userId)
       .single();
-    if (data) set({ user: data });
+    if (data) {
+      set({ user: data, loading: false });
+    } else {
+      // Profile record missing — synthesize fallback so app doesn't hang
+      set({
+        user: { id: userId, name: 'Rider', created_at: new Date().toISOString() } as Profile,
+        loading: false,
+      });
+    }
   },
 }));

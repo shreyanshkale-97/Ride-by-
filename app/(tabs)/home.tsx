@@ -59,7 +59,7 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>Hey, {user?.name?.split(' ')[0]} 👋</Text>
+          <Text style={styles.greeting}>Hey, {user?.name?.trim() ? user.name.split(' ')[0] : 'Rider'} 👋</Text>
           <Text style={styles.subtitle}>Ready to ride?</Text>
         </View>
         <View style={styles.logoBadge}>

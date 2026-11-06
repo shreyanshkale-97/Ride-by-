@@ -42,7 +42,7 @@ export async function requestForegroundPermission(): Promise<boolean> {
     return status === 'granted';
   } catch (e) {
     console.warn('Foreground location permission error:', e);
-    return true; // Allow graceful fallback
+    return false; // FIXED: return false (not true) — permission was NOT granted
   }
 }
 
@@ -237,15 +237,9 @@ async function sendLocationBroadcast(
         payload,
       });
     } else {
-      // Fallback: create a temporary channel (may not work without subscription)
-      // This is kept as a last resort only
-      const channel = supabase.channel(`ride:${currentRideId}`);
-      await channel.send({
-        type: 'broadcast',
-        event: AppConstants.EVENT_LOCATION_UPDATE,
-        payload,
-      });
-      console.warn('[Location] Broadcasting on unsubscribed channel — set activeChannel for reliability');
+      // No active channel yet — skip broadcast to avoid zombie channel memory leak.
+      // The channel will be set once subscribeToRide() completes (within ~1.5s of initRide).
+      console.warn('[Location] Skipping broadcast — activeChannel not ready yet');
     }
   } catch (e) {
     console.warn('Realtime broadcast location error:', e);

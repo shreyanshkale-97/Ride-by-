@@ -12,12 +12,19 @@ export default function RootLayout() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
-        if (session?.user) {
-          await fetchProfile(session.user.id);
+        // CRITICAL FIX: Only navigate on SIGNED_IN — NOT on TOKEN_REFRESHED or USER_UPDATED
+        // TOKEN_REFRESHED fires every hour during active rides and would kick riders back to home!
+        if (event === 'SIGNED_IN' && session?.user) {
+          try {
+            await fetchProfile(session.user.id);
+          } catch (e) {
+            console.warn('[Auth] fetchProfile failed:', e);
+          }
           router.replace('/(tabs)/home');
         } else if (event === 'SIGNED_OUT') {
           router.replace('/(auth)/login');
         }
+        // TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION — handled silently
       }
     );
 

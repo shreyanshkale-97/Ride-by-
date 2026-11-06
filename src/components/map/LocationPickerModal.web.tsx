@@ -33,6 +33,7 @@ export function LocationPickerModal({
   const [resolvingName, setResolvingName] = useState(false);
 
   const iframeRef = useRef<any>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -66,15 +67,22 @@ export function LocationPickerModal({
     }
   }, []);
 
-  const handleSearch = async (text: string) => {
+  // Debounced search — prevents Nominatim IP ban (policy: max 1 req/sec)
+  const handleSearch = (text: string) => {
     setSearchQuery(text);
+    setSearchResults([]);
+
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+
     if (text.trim().length >= 2) {
       setSearching(true);
-      const results = await searchPlaces(text);
-      setSearchResults(results);
-      setSearching(false);
+      debounceTimerRef.current = setTimeout(async () => {
+        const results = await searchPlaces(text);
+        setSearchResults(results);
+        setSearching(false);
+      }, 500); // 500ms debounce — Nominatim safe rate
     } else {
-      setSearchResults([]);
+      setSearching(false);
     }
   };
 
