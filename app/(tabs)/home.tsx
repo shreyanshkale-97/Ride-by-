@@ -18,14 +18,23 @@ export default function HomeScreen() {
   }, [user]);
 
   const fetchRecentRides = async () => {
+    if (!user?.id) { setLoading(false); return; }
     setLoading(true);
-    const { data } = await supabase
-      .from('rides')
-      .select('*')
-      .in('status', ['planned', 'meeting', 'active'])
-      .order('created_at', { ascending: false })
-      .limit(5);
-    setRecentRides(data ?? []);
+    // Join through ride_members so we only see rides this user is part of
+    const { data: memberRows } = await supabase
+      .from('ride_members')
+      .select('ride:rides(*)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false, referencedTable: 'rides' })
+      .limit(10);
+
+    const rides = (memberRows ?? [])
+      .map((row: any) => row.ride)
+      .filter(Boolean)
+      .filter((r: any) => ['planned', 'meeting', 'active'].includes(r.status))
+      .slice(0, 5);
+
+    setRecentRides(rides);
     setLoading(false);
   };
 

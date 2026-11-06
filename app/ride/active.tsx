@@ -9,7 +9,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
 import { RideMap, DisplayRider } from '../../src/components/map/RideMap';
 import { useRideStore } from '../../src/store/rideStore';
-import { subscribeToRide, unsubscribeFromRide } from '../../src/services/realtimeService';
+import { subscribeToRide, unsubscribeFromRide, broadcastSOS } from '../../src/services/realtimeService';
 import {
   startLocationBroadcast, stopLocationBroadcast,
   requestForegroundPermission, requestBackgroundPermission,
@@ -76,6 +76,8 @@ export default function ActiveRideScreen() {
         supabase.removeChannel(chatChannelRef.current);
         chatChannelRef.current = null;
       }
+      // Clear all stale ride state from store (prevents ghost markers in next ride)
+      useRideStore.getState().clearRide();
     };
   }, [rideId]);
 
@@ -362,13 +364,21 @@ export default function ActiveRideScreen() {
           onPress: async () => {
             setSosActive(true);
             const authorId = user?.id || (await supabase.auth.getUser()).data?.user?.id;
+            const senderName = user?.name || 'Rider';
             if (authorId) {
+              // 1. Persist to DB
               await supabase.from('emergency_events').insert({
                 ride_id: rideId,
                 user_id: authorId,
                 latitude: myLat,
                 longitude: myLng,
               });
+              // 2. Broadcast over Realtime so other riders see it instantly
+              try {
+                await broadcastSOS(rideId, authorId, senderName, myLat, myLng);
+              } catch (e) {
+                console.warn('[SOS] Realtime broadcast failed, DB record saved:', e);
+              }
             }
             showAppAlert('SOS Sent', 'All riders have been alerted of your emergency!');
             setTimeout(() => setSosActive(false), 30000);

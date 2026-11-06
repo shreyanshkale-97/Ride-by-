@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   SafeAreaView, ScrollView, ActivityIndicator,
@@ -71,12 +71,13 @@ export default function PlanRideScreen() {
 
   const [rideName, setRideName]       = useState('');
   const [meetingName, setMeetingName] = useState('');
-  const [meetingLat, setMeetingLat]   = useState('22.7196');
-  const [meetingLng, setMeetingLng]   = useState('75.8577');
+  const [meetingLat, setMeetingLat]   = useState('');
+  const [meetingLng, setMeetingLng]   = useState('');
   const [destName, setDestName]       = useState('');
   const [destLat, setDestLat]         = useState('');
   const [destLng, setDestLng]         = useState('');
   const [loading, setLoading]         = useState(false);
+  const [gpsLoading, setGpsLoading]   = useState(true);
 
   const [nameActive, setNameActive]       = useState(false);
   const [meetActive, setMeetActive]       = useState(false);
@@ -89,6 +90,43 @@ export default function PlanRideScreen() {
   // Map Picker State
   const [pickerVisible, setPickerVisible]   = useState(false);
   const [pickerTarget, setPickerTarget]     = useState<'meeting' | 'destination'>('meeting');
+
+  // ── Auth guard ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!user?.id) {
+      router.replace('/(auth)/login');
+    }
+  }, [user]);
+
+  // ── Auto-fill meeting point from real GPS ───────────────────
+  useEffect(() => {
+    if (meetingLat) return; // already set by picker
+    setGpsLoading(true);
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setMeetingLat(pos.coords.latitude.toFixed(5));
+          setMeetingLng(pos.coords.longitude.toFixed(5));
+          if (!meetingName) setMeetingName('My Location');
+          setGpsLoading(false);
+        },
+        () => setGpsLoading(false),
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    } else {
+      // Native: use expo-location
+      import('expo-location').then((Location) => {
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+          .then((pos) => {
+            setMeetingLat(pos.coords.latitude.toFixed(5));
+            setMeetingLng(pos.coords.longitude.toFixed(5));
+            if (!meetingName) setMeetingName('My Location');
+          })
+          .catch(() => {})
+          .finally(() => setGpsLoading(false));
+      });
+    }
+  }, []);
 
   const handleOpenPicker = (target: 'meeting' | 'destination') => {
     setPickerTarget(target);
@@ -108,6 +146,11 @@ export default function PlanRideScreen() {
   };
 
   const handleNextReviewRoute = () => {
+    if (!user?.id) {
+      showAppAlert('Login Required', 'Please log in to create a ride.');
+      router.replace('/(auth)/login');
+      return;
+    }
     if (!rideName.trim()) {
       showAppAlert('Missing Ride Name', 'Please enter a name for your ride.');
       return;
@@ -126,14 +169,15 @@ export default function PlanRideScreen() {
       params: {
         name: rideName.trim(),
         meetingName: meetingName.trim(),
-        meetingLat,
-        meetingLng,
+        meetingLat: parseFloat(meetingLat).toString(),
+        meetingLng: parseFloat(meetingLng).toString(),
         destName: destName.trim(),
-        destLat,
-        destLng,
+        destLat: parseFloat(destLat).toString(),
+        destLng: parseFloat(destLng).toString(),
       },
     });
   };
+
 
   return (
     <SafeAreaView style={s.container}>

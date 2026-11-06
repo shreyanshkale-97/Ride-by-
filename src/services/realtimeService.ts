@@ -103,18 +103,31 @@ export async function broadcastSOS(
   lat: number,
   lng: number
 ) {
-  const channel = supabase.channel(`ride:${rideId}`);
-  await channel.send({
-    type: 'broadcast',
-    event: AppConstants.EVENT_SOS,
-    payload: {
-      user_id: userId,
-      name,
-      lat,
-      lng,
-      timestamp: Date.now(),
-    } as SosPayload,
-  });
+  const payload = {
+    user_id: userId,
+    name,
+    lat,
+    lng,
+    timestamp: Date.now(),
+  } as SosPayload;
+
+  try {
+    if (activeChannel) {
+      // Use the already-subscribed channel (correct — avoids silent failure)
+      await activeChannel.send({
+        type: 'broadcast',
+        event: AppConstants.EVENT_SOS,
+        payload,
+      });
+    } else {
+      // Fallback: create new channel (may fail on private channels, but we try)
+      console.warn('[SOS] No active channel — creating temporary one (may fail)');
+      const ch = supabase.channel(`ride:${rideId}`);
+      await ch.send({ type: 'broadcast', event: AppConstants.EVENT_SOS, payload });
+    }
+  } catch (e) {
+    console.error('[SOS] Broadcast failed:', e);
+  }
 }
 
 // ============================================================

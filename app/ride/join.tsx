@@ -56,6 +56,11 @@ export default function JoinRideScreen() {
         .maybeSingle();
 
       if (rideDirect) {
+        // Block joining completed or cancelled rides
+        if (rideDirect.status === 'completed' || rideDirect.status === 'cancelled') {
+          showAppAlert('Ride Ended', 'This ride has already finished or was cancelled.');
+          return;
+        }
         setPreview({
           ride_id: rideDirect.id,
           ride_name: rideDirect.name,
@@ -71,7 +76,15 @@ export default function JoinRideScreen() {
       showAppAlert('Not Found', 'No active ride found with that code.');
       return;
     }
-    setPreview(data[0] as RidePreview);
+
+    const result = data[0] as RidePreview;
+    // Block joining completed or cancelled rides
+    if (result.status === 'completed' || result.status === 'cancelled') {
+      showAppAlert('Ride Ended', 'This ride has already finished or was cancelled.');
+      return;
+    }
+    setPreview(result);
+
   };
 
   const handleJoin = async () => {

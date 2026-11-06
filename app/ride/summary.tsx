@@ -48,19 +48,23 @@ export default function SummaryScreen() {
     const count = membersRes.data?.length ?? 0;
     setMemberCount(count);
 
-    // Save to ride history
-    const start = rideRes.data?.started_at ? new Date(rideRes.data.started_at) : null;
-    const end = rideRes.data?.ended_at ? new Date(rideRes.data.ended_at) : new Date();
-    const durationMin = start ? Math.round((end.getTime() - start.getTime()) / 60000) : null;
+    // Save to ride history — only if user is logged in
+    if (user?.id) {
+      const start = rideRes.data?.started_at ? new Date(rideRes.data.started_at) : null;
+      const end = rideRes.data?.ended_at ? new Date(rideRes.data.ended_at) : new Date();
+      const durationMin = start ? Math.round((end.getTime() - start.getTime()) / 60000) : null;
 
-    await supabase.from('ride_history').upsert({
-      ride_id: rideId,
-      user_id: user!.id,
-      duration_min: durationMin,
-      member_count: count,
-    });
+      const { error: histErr } = await supabase.from('ride_history').upsert({
+        ride_id: rideId,
+        user_id: user.id,
+        duration_min: durationMin,
+        member_count: count,
+      });
+      if (histErr) console.warn('[Summary] History save failed:', histErr.message);
+    }
 
     setLoading(false);
+
   };
 
   const getDuration = () => {
