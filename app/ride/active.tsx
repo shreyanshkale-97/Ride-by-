@@ -57,7 +57,9 @@ export default function ActiveRideScreen() {
   const [routeSteps, setRouteSteps] = useState<RouteStep[]>([]);
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
   const [distToNextStep, setDistToNextStep] = useState(0);
-  const [navCentered, setNavCentered] = useState(true); // auto-follow my location
+  const [navCentered, setNavCentered] = useState(true);
+  const [myHeading, setMyHeading] = useState(0); // compass bearing 0-360
+
 
   useEffect(() => {
     if (!rideId) return;
@@ -256,30 +258,34 @@ export default function ActiveRideScreen() {
       }, 1500);
     }
 
-    // 7. CONTINUOUS GPS WATCH — THE CRITICAL FIX
-    // Without this, myLat/myLng is frozen at the initial value and your blue dot never moves.
+    // 7. CONTINUOUS GPS WATCH — keeps myLat/myLng/myHeading live during the ride
     try {
       if (Platform.OS !== 'web') {
-        // Native: expo-location watchPositionAsync updates React state continuously
         const sub = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.BestForNavigation,
-            timeInterval: 5000,    // at least every 5s
-            distanceInterval: 10,  // or every 10m of movement
+            timeInterval: 5000,
+            distanceInterval: 10,
           },
           (position) => {
             setMyLat(position.coords.latitude);
             setMyLng(position.coords.longitude);
+            // heading is null when stationary — keep last value in that case
+            if (position.coords.heading !== null && position.coords.heading >= 0) {
+              setMyHeading(position.coords.heading);
+            }
           }
         );
         gpsWatchRef.current = sub;
       } else {
-        // Web: browser Geolocation API
         if (typeof navigator !== 'undefined' && navigator.geolocation) {
           const watchId = navigator.geolocation.watchPosition(
             (position) => {
               setMyLat(position.coords.latitude);
               setMyLng(position.coords.longitude);
+              if (position.coords.heading !== null && position.coords.heading >= 0) {
+                setMyHeading(position.coords.heading);
+              }
             },
             (err) => console.warn('[GPS Web] watchPosition error:', err.message),
             { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
@@ -291,13 +297,16 @@ export default function ActiveRideScreen() {
       }
     } catch (gpsErr) {
       console.warn('[GPS] Watch setup failed, falling back to polling:', gpsErr);
-      // Fallback: poll getCurrentLocation every 10s
       const pollInterval = setInterval(async () => {
         try {
           const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
           setMyLat(pos.coords.latitude);
           setMyLng(pos.coords.longitude);
+          if (pos.coords.heading !== null && pos.coords.heading >= 0) {
+            setMyHeading(pos.coords.heading);
+          }
         } catch (_) {}
+
       }, 10000);
       gpsWatchRef.current = { remove: () => clearInterval(pollInterval) } as unknown as Location.LocationSubscription;
     }
@@ -390,9 +399,7 @@ export default function ActiveRideScreen() {
     ]);
   };
 
-  // ── Issue #5 & #4 Fix: Memoized displayRiders with stale detection ──
-  // useMemo prevents expensive distance calculations on every render.
-  // Stale detection: if no GPS update for 60s, rider is marked offline.
+  // ── Memoized displayRiders: stale detection + real heading for self ──
   const STALE_THRESHOLD_MS = 60_000;
 
   const displayRiders = useMemo<DisplayRider[]>(() => {
@@ -404,65 +411,77 @@ export default function ActiveRideScreen() {
       const name = member.profile?.name ?? (isSelf ? (user?.name || 'You') : 'Rider');
       const role = member.role;
 
-      // Check if this rider's GPS is stale (no update in 60s)
       const lastUpdated = isSelf ? now : (liveMarker?.lastUpdated ?? 0);
       const isStale = !isSelf && liveMarker ? (now - lastUpdated > STALE_THRESHOLD_MS) : false;
 
-      // Position: use live GPS or fallback to meeting point
       const lat = isSelf ? myLat : (liveMarker?.lat ?? ride?.meeting_lat ?? myLat);
       const lng = isSelf ? myLng : (liveMarker?.lng ?? ride?.meeting_lng ?? myLng);
       const speed = isSelf ? 0 : (liveMarker?.speed ?? 0);
-      const heading = isSelf ? 0 : (liveMarker?.heading ?? 0);
+      // FIX: use live myHeading for self (was hardcoded 0 — made rider view useless)
+      const heading = isSelf ? myHeading : (liveMarker?.heading ?? 0);
       const isLive = Boolean(isSelf || liveMarker);
 
-      // Status: stale = offline visually
       const status = isSelf
         ? 'riding'
-        : isStale
-          ? 'offline'
-          : liveMarker
-            ? (liveMarker.speed < 5 ? 'stopped' : 'riding')
-            : member.status;
-
-      const distFromMe = isSelf ? 0 : calcDistanceM(myLat, myLng, lat, lng);
+        : isStale ? 'offline'
+        : liveMarker ? (liveMarker.speed < 5 ? 'stopped' : 'riding')
+        : member.status;
 
       return {
         userId: member.user_id,
-        name,
-        role,
-        status,
-        lat,
-        lng,
-        speed,
-        heading,
-        isLive,
-        isSelf,
-        lastUpdated,       // passed to RideMap for stale marker styling
-        distanceFromMe: distFromMe,
+        name, role, status, lat, lng, speed, heading, isLive, isSelf,
+        lastUpdated,
+        distanceFromMe: isSelf ? 0 : calcDistanceM(myLat, myLng, lat, lng),
         distanceFromLeader: 0,
         relativeToLeader: 'together' as const,
       };
     });
 
-    // Calculate distances relative to the group leader
     const leader = riders.find((r) => r.role === 'leader') || riders[0];
     if (leader) {
       riders.forEach((r) => {
         r.distanceFromLeader = calcDistanceM(leader.lat, leader.lng, r.lat, r.lng);
-        r.relativeToLeader = getRelativePosition(
-          leader.lat, leader.lng, leader.heading, r.lat, r.lng
-        );
+        r.relativeToLeader = getRelativePosition(leader.lat, leader.lng, leader.heading, r.lat, r.lng);
       });
     }
-
     return riders;
-  }, [myLat, myLng, riderMarkers, rideMembers, user?.id, user?.name, ride]);
+  }, [myLat, myLng, myHeading, riderMarkers, rideMembers, user?.id, user?.name, ride]);
 
   // Distance remaining to destination (memoized)
   const remainingDistToDest = useMemo(
     () => ride ? calcDistanceM(myLat, myLng, ride.destination_lat, ride.destination_lng) : 0,
     [myLat, myLng, ride]
   );
+
+  // ── Send NAV_INFO to iframe for Rider View bottom bar ──────────
+  // Tells the Leaflet iframe the current nav step, ETA, and destination
+  // so the rider view can show it in the Google Maps–style info bar.
+  useEffect(() => {
+    if (!iframeRef.current?.contentWindow) return;
+    const step = routeSteps[currentStepIdx];
+    const etaMinutes = remainingDistToDest > 0
+      ? Math.round((remainingDistToDest / 1000) / 50 * 60)  // rough 50 km/h estimate
+      : 0;
+    const now = new Date();
+    const etaTime = new Date(now.getTime() + etaMinutes * 60000);
+    const etaStr = etaTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    try {
+      iframeRef.current.contentWindow.postMessage({
+        type: 'NAV_INFO',
+        instruction: step?.instruction ?? 'Follow the route',
+        maneuverType: step?.maneuverType ?? 'depart',
+        maneuverModifier: step?.maneuverModifier ?? 'straight',
+        distToNextM: Math.round(distToNextStep),
+        remainingKm: +(remainingDistToDest / 1000).toFixed(1),
+        etaMinutes,
+        etaTime: etaStr,
+        destName: ride?.destination_name ?? 'Destination',
+        stepNum: currentStepIdx + 1,
+        totalSteps: routeSteps.length,
+      }, '*');
+    } catch (_) {}
+  }, [currentStepIdx, distToNextStep, remainingDistToDest, ride?.destination_name, routeSteps.length]);
 
 
 
