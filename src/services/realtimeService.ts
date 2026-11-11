@@ -32,7 +32,9 @@ export function subscribeToRide(
   const store = useRideStore.getState();
 
   const channel = supabase.channel(`ride:${rideId}`, {
-    config: { private: true },   // REQUIRED: enables RLS authorization
+    config: {
+      broadcast: { self: false },
+    },
   });
 
   channel

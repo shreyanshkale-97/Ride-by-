@@ -38,8 +38,8 @@ export default function ActiveRideScreen() {
   const gpsWatchRef = useRef<Location.LocationSubscription | null>(null);
 
 
-  const [myLat, setMyLat] = useState(22.7196);
-  const [myLng, setMyLng] = useState(75.8577);
+  const [myLat, setMyLat] = useState(activeRide?.meeting_lat || 22.7196);
+  const [myLng, setMyLng] = useState(activeRide?.meeting_lng || 75.8577);
   const [ride, setRide] = useState<Ride | null>(activeRide);
   const [rideMembers, setRideMembers] = useState<RideMember[]>(members);
   const [routeCoordinates, setRouteCoordinates] = useState<{ lat: number; lng: number }[]>([]);
