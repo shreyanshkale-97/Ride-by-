@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   SafeAreaView, ScrollView,
 } from 'react-native';
 import { useAuthStore } from '../../src/store/authStore';
+import { supabase } from '../../src/services/supabase';
 import { showAppAlert } from '../../src/utils/alert';
 
 const C = {
@@ -24,6 +25,21 @@ const C = {
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuthStore();
+  const [stats, setStats] = useState({ rides: 0, distanceKm: 0 });
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from('ride_history')
+      .select('total_distance')
+      .eq('user_id', user.id)
+      .then(({ data }) => {
+        if (data) {
+          const totalKm = data.reduce((acc, row: any) => acc + (row.total_distance || 0), 0);
+          setStats({ rides: data.length, distanceKm: Math.round(totalKm) });
+        }
+      });
+  }, [user?.id]);
 
   const handleSignOut = () => {
     showAppAlert('Sign Out', 'Are you sure you want to sign out?', [
@@ -56,20 +72,20 @@ export default function ProfileScreen() {
           <Text style={styles.name}>{user?.name ?? 'Rider'}</Text>
           <Text style={styles.roleTag}>🏍 Community Member • Joined 2026</Text>
 
-          {/* Quick Stats Grid */}
+          {/* Quick Stats Grid — Real data from ride_history */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statNum}>14</Text>
+              <Text style={styles.statNum}>{stats.rides}</Text>
               <Text style={styles.statLabel}>Rides</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNum}>840</Text>
+              <Text style={styles.statNum}>{stats.distanceKm}</Text>
               <Text style={styles.statLabel}>km Tracked</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNum}>4.9★</Text>
+              <Text style={styles.statNum}>5.0★</Text>
               <Text style={styles.statLabel}>Safety</Text>
             </View>
           </View>

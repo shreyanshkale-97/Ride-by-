@@ -20,18 +20,24 @@ export default function HomeScreen() {
   const fetchRecentRides = async () => {
     if (!user?.id) { setLoading(false); return; }
     setLoading(true);
-    // Join through ride_members so we only see rides this user is part of
-    const { data: memberRows } = await supabase
-      .from('ride_members')
-      .select('ride:rides(*)')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false, referencedTable: 'rides' })
-      .limit(10);
+    // Fetch rides user created OR is a member of
+    const [memberRes, creatorRes] = await Promise.all([
+      supabase.from('ride_members').select('ride:rides(*)').eq('user_id', user.id),
+      supabase.from('rides').select('*').eq('creator_id', user.id).order('created_at', { ascending: false }).limit(10),
+    ]);
 
-    const rides = (memberRows ?? [])
-      .map((row: any) => row.ride)
-      .filter(Boolean)
-      .filter((r: any) => ['planned', 'meeting', 'active'].includes(r.status))
+    const memberRides = (memberRes.data ?? []).map((row: any) => row.ride).filter(Boolean);
+    const creatorRides = creatorRes.data ?? [];
+
+    // Merge and deduplicate by ride.id
+    const rideMap = new Map<string, any>();
+    [...creatorRides, ...memberRides].forEach((r) => {
+      if (r && r.id) rideMap.set(r.id, r);
+    });
+
+    const rides = Array.from(rideMap.values())
+      .filter((r) => ['planned', 'meeting', 'active'].includes(r.status))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 5);
 
     setRecentRides(rides);
